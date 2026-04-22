@@ -13,19 +13,14 @@
     "Programming Languages",
     "Other"
   ],
-  "activationEvents": [
-    "onLanguage:javascript",
-    "onLanguage:typescript",
-    "onLanguage:python",
-    "onLanguage:java",
-    "onLanguage:go",
-    "onLanguage:rust",
-    "onLanguage:cpp",
-    "onLanguage:c"
-  ],
+  "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
+      {
+        "command": "linkcode.setApiKey",
+        "title": "LinkCode: Set API Key"
+      },
       {
         "command": "linkcode.openChat",
         "title": "LinkCode: Open Chat"
@@ -41,6 +36,10 @@
       {
         "command": "linkcode.refactorCode",
         "title": "LinkCode: Refactor Code"
+      },
+      {
+        "command": "linkcode.applyInlineEdit",
+        "title": "LinkCode: Apply Inline Edit"
       }
     ],
     "keybindings": [
@@ -62,11 +61,6 @@
           "type": "string",
           "default": "https://api.linkcode.ai",
           "description": "LinkCode API endpoint"
-        },
-        "linkcode.apiKey": {
-          "type": "string",
-          "default": "",
-          "description": "LinkCode API key"
         },
         "linkcode.enableInlineCompletion": {
           "type": "boolean",
