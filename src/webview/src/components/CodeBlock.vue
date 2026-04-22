@@ -1,16 +1,35 @@
 <script setup lang="ts">
-defineProps<{
+import { ref } from 'vue'
+
+const props = defineProps<{
   code: string
   language?: string
 }>()
+
+const buttonText = ref('Copy')
+
+async function handleCopy() {
+  try {
+    await navigator.clipboard.writeText(props.code)
+    buttonText.value = 'Copied!'
+    setTimeout(() => {
+      buttonText.value = 'Copy'
+    }, 2000)
+  } catch {
+    buttonText.value = 'Failed'
+    setTimeout(() => {
+      buttonText.value = 'Copy'
+    }, 2000)
+  }
+}
 </script>
 
 <template>
   <div class="code-block">
     <div class="code-block__header">
       <span class="code-block__lang">{{ language ?? 'text' }}</span>
-      <button class="code-block__copy" @click="navigator.clipboard.writeText(code)">
-        Copy
+      <button class="code-block__copy" @click="handleCopy">
+        {{ buttonText }}
       </button>
     </div>
     <pre class="code-block__body"><code>{{ code }}</code></pre>

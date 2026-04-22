@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import ChatMessage from './components/ChatMessage.vue'
 import ChatInput from './components/ChatInput.vue'
 import { useChat } from './composables/useChat'
@@ -8,18 +8,34 @@ import { useVSCode } from './composables/useVSCode'
 const { messages, sendMessage, isLoading } = useChat()
 const { postMessage } = useVSCode()
 
+const messagesListRef = ref<HTMLElement | null>(null)
+
 function handleSend(text: string) {
   sendMessage(text)
   postMessage({ type: 'sendMessage', payload: text })
 }
+
+function scrollToBottom() {
+  if (messagesListRef.value) {
+    messagesListRef.value.scrollTop = messagesListRef.value.scrollHeight
+  }
+}
+
+watch(
+  messages,
+  () => {
+    nextTick(scrollToBottom)
+  },
+  { deep: true }
+)
 </script>
 
 <template>
   <div class="chat-container">
-    <div class="messages-list">
+    <div ref="messagesListRef" class="messages-list">
       <ChatMessage
-        v-for="(msg, idx) in messages"
-        :key="idx"
+        v-for="msg in messages"
+        :key="msg.id"
         :role="msg.role"
         :content="msg.content"
       />

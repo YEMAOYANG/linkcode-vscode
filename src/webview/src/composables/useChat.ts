@@ -2,8 +2,13 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useVSCode } from './useVSCode'
 
 export interface ChatMsg {
+  id: string
   role: 'user' | 'assistant'
   content: string
+}
+
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
 
 export function useChat() {
@@ -15,35 +20,41 @@ export function useChat() {
 
   onMounted(() => {
     cleanup = onMessage((event: MessageEvent) => {
-      const msg = event.data as { type: string; payload?: string; action?: string }
+      const msg = event.data as { type: string; payload?: string; action?: string; error?: string }
 
       switch (msg.type) {
         case 'assistantMessage':
           messages.value.push({
+            id: generateId(),
             role: 'assistant',
             content: msg.payload ?? '',
           })
           isLoading.value = false
           break
 
-        case 'streamToken':
+        case 'streamToken': {
           // Append to last assistant message (or create one)
-          if (
-            messages.value.length === 0 ||
-            messages.value[messages.value.length - 1].role !== 'assistant'
-          ) {
-            messages.value.push({ role: 'assistant', content: '' })
+          const lastMsg = messages.value[messages.value.length - 1]
+          if (!lastMsg || lastMsg.role !== 'assistant' || !isLoading.value) {
+            messages.value.push({ id: generateId(), role: 'assistant', content: '' })
           }
-          messages.value[messages.value.length - 1].content += msg.payload ?? ''
+          const current = messages.value[messages.value.length - 1]
+          current.content += msg.payload ?? ''
           break
+        }
 
         case 'streamDone':
+          isLoading.value = false
+          break
+
+        case 'streamError':
           isLoading.value = false
           break
 
         case 'userAction':
           // Triggered by CodeLens / command (explain, refactor, etc.)
           messages.value.push({
+            id: generateId(),
             role: 'user',
             content: `[${msg.action}]\n${msg.payload ?? ''}`,
           })
@@ -58,7 +69,7 @@ export function useChat() {
   })
 
   function sendMessage(text: string) {
-    messages.value.push({ role: 'user', content: text })
+    messages.value.push({ id: generateId(), role: 'user', content: text })
     isLoading.value = true
   }
 

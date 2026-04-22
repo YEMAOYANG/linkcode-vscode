@@ -1,8 +1,44 @@
 <script setup lang="ts">
-defineProps<{
+import { computed } from 'vue'
+import CodeBlock from './CodeBlock.vue'
+
+const props = defineProps<{
   role: 'user' | 'assistant'
   content: string
 }>()
+
+interface ContentPart {
+  type: 'text' | 'code'
+  content: string
+  language?: string
+}
+
+const parts = computed<ContentPart[]>(() => {
+  const result: ContentPart[] = []
+  const regex = /```(\w*)\n([\s\S]*?)```/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = regex.exec(props.content)) !== null) {
+    // Text before this code block
+    if (match.index > lastIndex) {
+      result.push({ type: 'text', content: props.content.slice(lastIndex, match.index) })
+    }
+    result.push({
+      type: 'code',
+      language: match[1] || 'text',
+      content: match[2],
+    })
+    lastIndex = match.index + match[0].length
+  }
+
+  // Remaining text
+  if (lastIndex < props.content.length) {
+    result.push({ type: 'text', content: props.content.slice(lastIndex) })
+  }
+
+  return result
+})
 </script>
 
 <template>
@@ -12,7 +48,16 @@ defineProps<{
     </div>
     <div class="chat-message__body">
       <div class="chat-message__role">{{ role === 'user' ? 'You' : 'LinkCode' }}</div>
-      <div class="chat-message__content">{{ content }}</div>
+      <div class="chat-message__content">
+        <template v-for="(part, idx) in parts" :key="idx">
+          <CodeBlock
+            v-if="part.type === 'code'"
+            :code="part.content"
+            :language="part.language"
+          />
+          <span v-else class="chat-message__text">{{ part.content }}</span>
+        </template>
+      </div>
     </div>
   </div>
 </template>
@@ -47,8 +92,11 @@ defineProps<{
 }
 
 .chat-message__content {
-  white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.5;
+}
+
+.chat-message__text {
+  white-space: pre-wrap;
 }
 </style>
