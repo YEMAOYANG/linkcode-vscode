@@ -1,14 +1,27 @@
 import * as vscode from 'vscode'
 import { fetchCompletion } from '../api/client'
 import { extractContext } from '../utils/context'
+import { CompletionCache } from '../completion/cache'
+import { CONFIG_SECTION } from '../shared/constants'
 
-export class InlineCompletionProvider implements vscode.InlineCompletionItemProvider {
+export class InlineCompletionProvider
+  implements vscode.InlineCompletionItemProvider, vscode.Disposable
+{
   private abortController: AbortController | null = null
-  private getApiKey: () => Promise<string | undefined>
   private debounceTimer: ReturnType<typeof setTimeout> | undefined
+  private readonly cache = new CompletionCache()
+  private readonly getApiKey: () => Promise<string | undefined>
 
   constructor(getApiKey: () => Promise<string | undefined>) {
     this.getApiKey = getApiKey
+  }
+
+  dispose(): void {
+    this.abortController?.abort()
+    if (this.debounceTimer !== undefined) {
+      clearTimeout(this.debounceTimer)
+    }
+    this.cache.clear()
   }
 
   async provideInlineCompletionItems(
@@ -21,14 +34,31 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
     this.abortController?.abort()
     this.abortController = new AbortController()
 
-    const config = vscode.workspace.getConfiguration('linkcode')
+    const config = vscode.workspace.getConfiguration(CONFIG_SECTION)
     if (!config.get<boolean>('enableInlineCompletion')) {
       return null
     }
 
-    const debounceMs = config.get<number>('completionDebounceMs') ?? 300
+    // Check LRU cache before debouncing
+    const linePrefix = document
+      .lineAt(position.line)
+      .text.substring(0, position.character)
+    const cacheKey = CompletionCache.buildKey(
+      document.uri.toString(),
+      linePrefix
+    )
+    const cached = this.cache.get(cacheKey)
+    if (cached) {
+      return new vscode.InlineCompletionList([
+        new vscode.InlineCompletionItem(
+          cached,
+          new vscode.Range(position, position)
+        ),
+      ])
+    }
 
     // Debounce: wait before making the request
+    const debounceMs = config.get<number>('completionDebounceMs') ?? 300
     if (this.debounceTimer !== undefined) {
       clearTimeout(this.debounceTimer)
     }
@@ -63,6 +93,9 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
       if (!completion) {
         return null
       }
+
+      // Store in cache
+      this.cache.set(cacheKey, completion)
 
       return new vscode.InlineCompletionList([
         new vscode.InlineCompletionItem(

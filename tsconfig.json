@@ -17,5 +17,5 @@
     "noUnusedParameters": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "src/webview", "test", "dist"]
+  "exclude": ["node_modules", "src/webview", "src/test", "test", "dist"]
 }

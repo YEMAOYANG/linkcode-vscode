@@ -5,6 +5,7 @@ import { CodeLensProvider } from './providers/CodeLensProvider'
 import { registerCommands } from './commands'
 import { Logger } from './utils/logger'
 import { SecretStore } from './utils/secretStorage'
+import { ApiClient } from './api/client'
 
 export function activate(context: vscode.ExtensionContext): void {
   const logger = Logger.getInstance(context)
@@ -13,6 +14,9 @@ export function activate(context: vscode.ExtensionContext): void {
   // Secret storage for API key
   const secretStore = new SecretStore(context.secrets)
   const getApiKey = () => secretStore.getApiKey()
+
+  // Centralized API client
+  const apiClient = new ApiClient(getApiKey)
 
   // Warn if API key is not set
   secretStore.getApiKey().then((key) => {
@@ -32,6 +36,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Inline Completion (Ghost Text)
   const inlineProvider = new InlineCompletionProvider(getApiKey)
+  context.subscriptions.push(inlineProvider)
   context.subscriptions.push(
     vscode.languages.registerInlineCompletionItemProvider(
       { pattern: '**' },
@@ -42,9 +47,11 @@ export function activate(context: vscode.ExtensionContext): void {
   // Chat WebView
   const chatProvider = new ChatViewProvider(context.extensionUri, getApiKey)
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider('linkcode.chatView', chatProvider, {
-      webviewOptions: { retainContextWhenHidden: true },
-    })
+    vscode.window.registerWebviewViewProvider(
+      'linkcode.chatView',
+      chatProvider,
+      { webviewOptions: { retainContextWhenHidden: true } }
+    )
   )
 
   // CodeLens
@@ -60,6 +67,9 @@ export function activate(context: vscode.ExtensionContext): void {
   registerCommands(context, chatProvider, secretStore)
 
   logger.info('LinkCode providers and commands registered')
+
+  // Export ApiClient for potential external use
+  return { apiClient } as unknown as void
 }
 
 export function deactivate(): void {
