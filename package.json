@@ -1,0 +1,119 @@
+{
+  "name": "linkcode",
+  "displayName": "LinkCode",
+  "description": "AI coding assistant — Inline completion, Chat, Code review",
+  "version": "0.0.1",
+  "publisher": "linkcode",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:python",
+    "onLanguage:java",
+    "onLanguage:go",
+    "onLanguage:rust",
+    "onLanguage:cpp",
+    "onLanguage:c"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "linkcode.openChat",
+        "title": "LinkCode: Open Chat"
+      },
+      {
+        "command": "linkcode.acceptCompletion",
+        "title": "LinkCode: Accept Completion"
+      },
+      {
+        "command": "linkcode.explainCode",
+        "title": "LinkCode: Explain Code"
+      },
+      {
+        "command": "linkcode.refactorCode",
+        "title": "LinkCode: Refactor Code"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "linkcode.openChat",
+        "key": "ctrl+shift+l",
+        "mac": "cmd+shift+l"
+      },
+      {
+        "command": "linkcode.acceptCompletion",
+        "key": "tab",
+        "when": "inlineSuggestionVisible"
+      }
+    ],
+    "configuration": {
+      "title": "LinkCode",
+      "properties": {
+        "linkcode.apiEndpoint": {
+          "type": "string",
+          "default": "https://api.linkcode.ai",
+          "description": "LinkCode API endpoint"
+        },
+        "linkcode.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "LinkCode API key"
+        },
+        "linkcode.enableInlineCompletion": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable inline code completion (Ghost Text)"
+        },
+        "linkcode.completionDebounceMs": {
+          "type": "number",
+          "default": 300,
+          "description": "Debounce delay for inline completion requests (ms)"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "linkcode-sidebar",
+          "title": "LinkCode",
+          "icon": "$(sparkle)"
+        }
+      ]
+    },
+    "views": {
+      "linkcode-sidebar": [
+        {
+          "type": "webview",
+          "id": "linkcode.chatView",
+          "name": "Chat"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "build:prod": "NODE_ENV=production node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "build:webview": "cd src/webview && pnpm run build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --require ts-node/register ./test/extension.test.ts",
+    "package": "vsce package --no-dependencies",
+    "lint": "eslint src --ext .ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  }
+}
