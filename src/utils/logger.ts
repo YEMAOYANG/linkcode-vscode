@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 
-export class Logger {
+export class Logger implements vscode.Disposable {
   private static instance: Logger
   private outputChannel: vscode.OutputChannel
 
@@ -8,11 +8,18 @@ export class Logger {
     this.outputChannel = vscode.window.createOutputChannel('LinkCode')
   }
 
-  public static getInstance(): Logger {
+  public static getInstance(context?: vscode.ExtensionContext): Logger {
     if (!Logger.instance) {
       Logger.instance = new Logger()
+      if (context) {
+        context.subscriptions.push(Logger.instance)
+      }
     }
     return Logger.instance
+  }
+
+  public dispose(): void {
+    this.outputChannel.dispose()
   }
 
   public info(message: string): void {
