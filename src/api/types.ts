@@ -39,3 +39,15 @@ export interface ApiError {
   error: string
   status: number
 }
+
+/** Messages sent from the extension to the WebView */
+export type ExtensionToWebview =
+  | { type: 'streamToken'; payload: string }
+  | { type: 'streamDone' }
+  | { type: 'streamError'; error: string }
+  | { type: 'userAction'; action: string; payload: string }
+
+/** Messages sent from the WebView to the extension */
+export type WebviewToExtension =
+  | { type: 'sendMessage'; payload: string }
+  | { type: 'ready' }

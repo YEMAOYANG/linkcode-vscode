@@ -1,11 +1,24 @@
 import * as vscode from 'vscode'
+import type { ChatMessage, ExtensionToWebview, WebviewToExtension } from '../api/types'
+import { streamChat } from '../api/client'
+import { parseSSEStream } from '../api/stream'
+import { getNonce } from '../utils/crypto'
+import { Logger } from '../utils/logger'
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'linkcode.chatView'
 
   private _view?: vscode.WebviewView
+  private _abortController?: AbortController
+  private _chatHistory: ChatMessage[] = []
+  private _getApiKey: () => Promise<string | undefined>
 
-  constructor(private readonly extensionUri: vscode.Uri) {}
+  constructor(
+    private readonly extensionUri: vscode.Uri,
+    getApiKey: () => Promise<string | undefined>
+  ) {
+    this._getApiKey = getApiKey
+  }
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -24,10 +37,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this._getHtml(webviewView.webview)
 
     // Handle messages from the WebView
-    webviewView.webview.onDidReceiveMessage((msg: WebviewMessage) => {
+    webviewView.webview.onDidReceiveMessage((msg: WebviewToExtension) => {
       switch (msg.type) {
         case 'sendMessage':
-          this._handleSendMessage(msg.payload as string)
+          this._handleSendMessage(msg.payload)
           break
         case 'ready':
           // WebView is ready
@@ -37,18 +50,55 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Send a message to the WebView
+   * Send a typed message to the WebView
    */
-  public postMessage(message: Record<string, unknown>): void {
+  public postMessage(message: ExtensionToWebview): void {
     this._view?.webview.postMessage(message)
   }
 
-  private _handleSendMessage(text: string): void {
-    // TODO: Call streaming API and push tokens to WebView
-    this.postMessage({
-      type: 'assistantMessage',
-      payload: `Echo: ${text}`,
-    })
+  private async _handleSendMessage(text: string): Promise<void> {
+    const logger = Logger.getInstance()
+
+    // Add user message to history
+    this._chatHistory.push({ role: 'user', content: text })
+
+    // Cancel any in-flight stream
+    this._abortController?.abort()
+    this._abortController = new AbortController()
+
+    try {
+      const response = await streamChat(
+        this._chatHistory,
+        this._getApiKey,
+        this._abortController.signal
+      )
+
+      let assistantContent = ''
+
+      for await (const chunk of parseSSEStream(response, this._abortController.signal)) {
+        if (chunk.type === 'token' && chunk.content) {
+          assistantContent += chunk.content
+          this.postMessage({ type: 'streamToken', payload: chunk.content })
+        } else if (chunk.type === 'error') {
+          this.postMessage({ type: 'streamError', error: chunk.error ?? 'Unknown error' })
+          logger.error(`Stream error: ${chunk.error}`)
+          return
+        } else if (chunk.type === 'done') {
+          break
+        }
+      }
+
+      // Save assistant response to history
+      this._chatHistory.push({ role: 'assistant', content: assistantContent })
+      this.postMessage({ type: 'streamDone' })
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return
+      }
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      this.postMessage({ type: 'streamError', error: errorMessage })
+      logger.error('Chat stream failed', err)
+    }
   }
 
   private _getHtml(webview: vscode.Webview): string {
@@ -76,19 +126,4 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 </body>
 </html>`
   }
-}
-
-interface WebviewMessage {
-  type: string
-  payload?: unknown
-}
-
-function getNonce(): string {
-  let text = ''
-  const possible =
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length))
-  }
-  return text
 }
