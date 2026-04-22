@@ -11,7 +11,7 @@ const buildOptions = {
   format: 'cjs',
   platform: 'node',
   target: 'node18',
-  sourcemap: true,
+  sourcemap: process.env.NODE_ENV !== 'production',
   minify: process.env.NODE_ENV === 'production',
   metafile: true,
 }
