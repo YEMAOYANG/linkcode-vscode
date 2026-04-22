@@ -1,15 +1,51 @@
 import * as vscode from 'vscode'
 
+export interface CodeContext {
+  prefix: string
+  suffix: string
+  language: string
+  filepath: string
+}
+
 /**
  * Extract code context around the cursor for AI requests.
+ * Overload: accepts TextEditor or TextDocument + Position.
  */
 export function extractContext(
   editor: vscode.TextEditor,
-  maxLinesBefore = 100,
-  maxLinesAfter = 50
-): { prefix: string; suffix: string; language: string; filepath: string } {
-  const document = editor.document
-  const position = editor.selection.active
+  maxLinesBefore?: number,
+  maxLinesAfter?: number
+): CodeContext
+export function extractContext(
+  document: vscode.TextDocument,
+  position: vscode.Position,
+  maxLinesBefore?: number,
+  maxLinesAfter?: number
+): CodeContext
+export function extractContext(
+  editorOrDoc: vscode.TextEditor | vscode.TextDocument,
+  positionOrMaxBefore?: vscode.Position | number,
+  maxLinesBeforeOrAfter?: number,
+  maxLinesAfterArg?: number
+): CodeContext {
+  let document: vscode.TextDocument
+  let position: vscode.Position
+  let maxLinesBefore: number
+  let maxLinesAfter: number
+
+  if ('document' in editorOrDoc) {
+    // TextEditor overload
+    document = editorOrDoc.document
+    position = editorOrDoc.selection.active
+    maxLinesBefore = (positionOrMaxBefore as number | undefined) ?? 100
+    maxLinesAfter = maxLinesBeforeOrAfter ?? 50
+  } else {
+    // TextDocument + Position overload
+    document = editorOrDoc
+    position = positionOrMaxBefore as vscode.Position
+    maxLinesBefore = maxLinesBeforeOrAfter ?? 100
+    maxLinesAfter = maxLinesAfterArg ?? 50
+  }
 
   const startLine = Math.max(0, position.line - maxLinesBefore)
   const endLine = Math.min(

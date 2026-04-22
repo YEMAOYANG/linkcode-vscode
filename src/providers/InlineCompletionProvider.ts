@@ -1,8 +1,15 @@
 import * as vscode from 'vscode'
 import { fetchCompletion } from '../api/client'
+import { extractContext } from '../utils/context'
 
 export class InlineCompletionProvider implements vscode.InlineCompletionItemProvider {
   private abortController: AbortController | null = null
+  private getApiKey: () => Promise<string | undefined>
+  private debounceTimer: ReturnType<typeof setTimeout> | undefined
+
+  constructor(getApiKey: () => Promise<string | undefined>) {
+    this.getApiKey = getApiKey
+  }
 
   async provideInlineCompletionItems(
     document: vscode.TextDocument,
@@ -19,23 +26,24 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
       return null
     }
 
-    // Extract context: up to 100 lines before cursor
-    const startLine = Math.max(0, position.line - 100)
-    const prefix = document.getText(
-      new vscode.Range(
-        new vscode.Position(startLine, 0),
-        position
-      )
-    )
+    const debounceMs = config.get<number>('completionDebounceMs') ?? 300
 
-    // Extract suffix: up to 50 lines after cursor
-    const endLine = Math.min(document.lineCount - 1, position.line + 50)
-    const suffix = document.getText(
-      new vscode.Range(
-        position,
-        new vscode.Position(endLine, document.lineAt(endLine).text.length)
-      )
-    )
+    // Debounce: wait before making the request
+    if (this.debounceTimer !== undefined) {
+      clearTimeout(this.debounceTimer)
+    }
+
+    await new Promise<void>((resolve) => {
+      this.debounceTimer = setTimeout(resolve, debounceMs)
+    })
+
+    // Check if cancelled during debounce
+    if (token.isCancellationRequested || this.abortController.signal.aborted) {
+      return null
+    }
+
+    // Extract context using shared utility
+    const ctx = extractContext(document, position)
 
     // Wire cancellation token to abort controller
     token.onCancellationRequested(() => this.abortController?.abort())
@@ -43,11 +51,12 @@ export class InlineCompletionProvider implements vscode.InlineCompletionItemProv
     try {
       const completion = await fetchCompletion(
         {
-          prefix,
-          suffix,
-          language: document.languageId,
-          filepath: document.uri.fsPath,
+          prefix: ctx.prefix,
+          suffix: ctx.suffix,
+          language: ctx.language,
+          filepath: ctx.filepath,
         },
+        this.getApiKey,
         this.abortController.signal
       )
 
