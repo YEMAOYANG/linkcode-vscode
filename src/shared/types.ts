@@ -22,6 +22,7 @@ export type ExtToWebMsg =
   | { type: 'stream_error'; message: string }
   | { type: 'inline_edit'; code: string; language: string }
   | { type: 'code_review'; code: string }
+  | { type: 'user_action'; action: 'explain' | 'refactor' | 'review'; payload: string }
 
 /**
  * Messages sent from the WebView to the Extension Host.

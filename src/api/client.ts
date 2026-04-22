@@ -1,5 +1,10 @@
 import * as vscode from 'vscode'
-import type { CompletionRequest, CompletionResponse, ChatMessage, ChatStreamChunk } from './types'
+import type {
+  CompletionRequest,
+  CompletionResponse,
+  ChatMessage,
+  ChatStreamChunk,
+} from './types'
 import { parseSSEStream } from './stream'
 import { Logger } from '../utils/logger'
 import { AuthError, ApiError } from '../shared/errors'
@@ -124,100 +129,4 @@ export class ApiClient {
     const config = vscode.workspace.getConfiguration(CONFIG_SECTION)
     return config.get<string>('apiEndpoint') ?? 'https://api.linkcode.ai'
   }
-}
-
-// ─── Legacy function exports (for backward compat during migration) ────────
-
-function getConfig() {
-  const config = vscode.workspace.getConfiguration(CONFIG_SECTION)
-  return {
-    apiEndpoint:
-      config.get<string>('apiEndpoint') ?? 'https://api.linkcode.ai',
-  }
-}
-
-function buildHeaders(apiKey?: string): Record<string, string> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (apiKey) {
-    headers['Authorization'] = `Bearer ${apiKey}`
-  }
-  return headers
-}
-
-/**
- * Fetch a single-shot code completion from the API.
- * @deprecated Use `ApiClient.complete()` instead.
- */
-export async function fetchCompletion(
-  payload: CompletionRequest,
-  getApiKey: () => Promise<string | undefined>,
-  signal: AbortSignal
-): Promise<string | null> {
-  const { apiEndpoint } = getConfig()
-  const apiKey = await getApiKey()
-  const logger = Logger.getInstance()
-
-  try {
-    const res = await fetch(`${apiEndpoint}/v1/complete`, {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(payload),
-      signal,
-    })
-
-    if (!res.ok) {
-      const errorBody = await res.text().catch(() => 'unknown')
-      logger.error(
-        `API request failed: ${res.status} ${res.statusText} — ${errorBody}`
-      )
-      return null
-    }
-
-    const data = (await res.json()) as CompletionResponse
-    return data.completion ?? null
-  } catch (err: unknown) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      return null
-    }
-    throw err
-  }
-}
-
-/**
- * Stream a chat response from the API (SSE).
- * @deprecated Use `ApiClient.streamChat()` instead.
- */
-export async function streamChat(
-  messages: ChatMessage[],
-  getApiKey: () => Promise<string | undefined>,
-  signal: AbortSignal
-): Promise<Response> {
-  const { apiEndpoint } = getConfig()
-  const apiKey = await getApiKey()
-
-  if (!apiKey) {
-    throw new AuthError(
-      'API key is not set. Please run "LinkCode: Set API Key" command.'
-    )
-  }
-
-  const res = await fetch(`${apiEndpoint}/v1/chat`, {
-    method: 'POST',
-    headers: buildHeaders(apiKey),
-    body: JSON.stringify({ messages, stream: true }),
-    signal,
-  })
-
-  if (!res.ok) {
-    const logger = Logger.getInstance()
-    const errorBody = await res.text().catch(() => 'unknown')
-    logger.error(
-      `Chat API request failed: ${res.status} ${res.statusText} — ${errorBody}`
-    )
-    throw new ApiError(`API error: ${res.status} ${res.statusText}`, res.status)
-  }
-
-  return res
 }

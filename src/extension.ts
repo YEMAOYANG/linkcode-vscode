@@ -15,7 +15,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const secretStore = new SecretStore(context.secrets)
   const getApiKey = () => secretStore.getApiKey()
 
-  // Centralized API client
+  // Centralized API client — single instance shared by all providers
   const apiClient = new ApiClient(getApiKey)
 
   // Warn if API key is not set
@@ -35,7 +35,7 @@ export function activate(context: vscode.ExtensionContext): void {
   })
 
   // Inline Completion (Ghost Text)
-  const inlineProvider = new InlineCompletionProvider(getApiKey)
+  const inlineProvider = new InlineCompletionProvider(apiClient)
   context.subscriptions.push(inlineProvider)
   context.subscriptions.push(
     vscode.languages.registerInlineCompletionItemProvider(
@@ -45,7 +45,7 @@ export function activate(context: vscode.ExtensionContext): void {
   )
 
   // Chat WebView
-  const chatProvider = new ChatViewProvider(context.extensionUri, getApiKey)
+  const chatProvider = new ChatViewProvider(context.extensionUri, apiClient)
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       'linkcode.chatView',
@@ -67,9 +67,6 @@ export function activate(context: vscode.ExtensionContext): void {
   registerCommands(context, chatProvider, secretStore)
 
   logger.info('LinkCode providers and commands registered')
-
-  // Export ApiClient for potential external use
-  return { apiClient } as unknown as void
 }
 
 export function deactivate(): void {

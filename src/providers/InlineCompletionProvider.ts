@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import { fetchCompletion } from '../api/client'
+import type { ApiClient } from '../api/client'
 import { extractContext } from '../utils/context'
 import { CompletionCache } from '../completion/cache'
 import { CONFIG_SECTION } from '../shared/constants'
@@ -10,10 +10,10 @@ export class InlineCompletionProvider
   private abortController: AbortController | null = null
   private debounceTimer: ReturnType<typeof setTimeout> | undefined
   private readonly cache = new CompletionCache()
-  private readonly getApiKey: () => Promise<string | undefined>
+  private readonly apiClient: ApiClient
 
-  constructor(getApiKey: () => Promise<string | undefined>) {
-    this.getApiKey = getApiKey
+  constructor(apiClient: ApiClient) {
+    this.apiClient = apiClient
   }
 
   dispose(): void {
@@ -79,14 +79,13 @@ export class InlineCompletionProvider
     token.onCancellationRequested(() => this.abortController?.abort())
 
     try {
-      const completion = await fetchCompletion(
+      const completion = await this.apiClient.complete(
         {
           prefix: ctx.prefix,
           suffix: ctx.suffix,
           language: ctx.language,
           filepath: ctx.filepath,
         },
-        this.getApiKey,
         this.abortController.signal
       )
 

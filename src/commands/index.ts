@@ -50,7 +50,9 @@ export function registerCommands(
       async (uri: vscode.Uri, range: vscode.Range, newText: string) => {
         const success = await applyInlineEdit(uri, range, newText)
         if (!success) {
-          vscode.window.showErrorMessage('LinkCode: Failed to apply inline edit.')
+          vscode.window.showErrorMessage(
+            'LinkCode: Failed to apply inline edit.'
+          )
         }
       }
     )
@@ -64,11 +66,13 @@ export function registerCommands(
         const editor = vscode.window.activeTextEditor
         const selectedText = getSelectedOrRangeText(editor, document, range)
         if (!selectedText) {
-          vscode.window.showWarningMessage('LinkCode: No code selected to explain.')
+          vscode.window.showWarningMessage(
+            'LinkCode: No code selected to explain.'
+          )
           return
         }
         chatProvider.postMessage({
-          type: 'userAction',
+          type: 'user_action',
           action: 'explain',
           payload: selectedText,
         })
@@ -85,11 +89,13 @@ export function registerCommands(
         const editor = vscode.window.activeTextEditor
         const selectedText = getSelectedOrRangeText(editor, document, range)
         if (!selectedText) {
-          vscode.window.showWarningMessage('LinkCode: No code selected to refactor.')
+          vscode.window.showWarningMessage(
+            'LinkCode: No code selected to refactor.'
+          )
           return
         }
         chatProvider.postMessage({
-          type: 'userAction',
+          type: 'user_action',
           action: 'refactor',
           payload: selectedText,
         })

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode'
-import type { ChatMessage, ExtensionToWebview, WebviewToExtension } from '../api/types'
-import { streamChat } from '../api/client'
-import { parseSSEStream } from '../api/stream'
+import type { ExtToWebMsg, WebToExtMsg } from '../shared/types'
+import type { ChatMessage } from '../api/types'
+import type { ApiClient } from '../api/client'
 import { getNonce } from '../utils/crypto'
 import { Logger } from '../utils/logger'
 
@@ -11,14 +11,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView
   private _abortController?: AbortController
   private _chatHistory: ChatMessage[] = []
-  private _getApiKey: () => Promise<string | undefined>
 
   constructor(
     private readonly extensionUri: vscode.Uri,
-    getApiKey: () => Promise<string | undefined>
-  ) {
-    this._getApiKey = getApiKey
-  }
+    private readonly apiClient: ApiClient
+  ) {}
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -37,10 +34,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this._getHtml(webviewView.webview)
 
     // Handle messages from the WebView
-    webviewView.webview.onDidReceiveMessage((msg: WebviewToExtension) => {
+    webviewView.webview.onDidReceiveMessage((msg: WebToExtMsg) => {
       switch (msg.type) {
         case 'sendMessage':
-          this._handleSendMessage(msg.payload)
+          this._handleSendMessage(msg.text)
           break
         case 'ready':
           // WebView is ready
@@ -50,9 +47,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Send a typed message to the WebView
+   * Send a typed message to the WebView.
    */
-  public postMessage(message: ExtensionToWebview): void {
+  public postMessage(message: ExtToWebMsg): void {
     this._view?.webview.postMessage(message)
   }
 
@@ -66,21 +63,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this._abortController?.abort()
     this._abortController = new AbortController()
 
-    try {
-      const response = await streamChat(
-        this._chatHistory,
-        this._getApiKey,
-        this._abortController.signal
-      )
+    this.postMessage({ type: 'stream_start' })
 
+    try {
       let assistantContent = ''
 
-      for await (const chunk of parseSSEStream(response, this._abortController.signal)) {
+      for await (const chunk of this.apiClient.streamChat(
+        this._chatHistory,
+        this._abortController.signal
+      )) {
         if (chunk.type === 'token' && chunk.content) {
           assistantContent += chunk.content
-          this.postMessage({ type: 'streamToken', payload: chunk.content })
+          this.postMessage({ type: 'stream_chunk', content: chunk.content })
         } else if (chunk.type === 'error') {
-          this.postMessage({ type: 'streamError', error: chunk.error ?? 'Unknown error' })
+          this.postMessage({
+            type: 'stream_error',
+            message: chunk.error ?? 'Unknown error',
+          })
           logger.error(`Stream error: ${chunk.error}`)
           return
         } else if (chunk.type === 'done') {
@@ -90,13 +89,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
       // Save assistant response to history
       this._chatHistory.push({ role: 'assistant', content: assistantContent })
-      this.postMessage({ type: 'streamDone' })
+      this.postMessage({ type: 'stream_end' })
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
         return
       }
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
-      this.postMessage({ type: 'streamError', error: errorMessage })
+      this.postMessage({ type: 'stream_error', message: errorMessage })
       logger.error('Chat stream failed', err)
     }
   }

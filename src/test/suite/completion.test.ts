@@ -74,7 +74,6 @@ suite('CompletionCache', () => {
 
 suite('debounce utility', () => {
   test('should delay execution', async () => {
-    // Import at runtime to avoid vscode dependency issues in test
     const { debounce } = await import('../../utils/debounce')
     let callCount = 0
     const fn = debounce(() => { callCount++ }, 50)
@@ -102,5 +101,58 @@ suite('debounce utility', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 40))
     assert.strictEqual(callCount, 1, 'should fire once after final delay')
+  })
+})
+
+suite('shared/errors', () => {
+  test('LinkCodeError should have correct code', async () => {
+    const { LinkCodeError } = await import('../../shared/errors')
+    const err = new LinkCodeError('test', 'TEST_CODE')
+    assert.strictEqual(err.code, 'TEST_CODE')
+    assert.strictEqual(err.message, 'test')
+    assert.strictEqual(err.name, 'LinkCodeError')
+  })
+
+  test('ApiError should have status', async () => {
+    const { ApiError } = await import('../../shared/errors')
+    const err = new ApiError('not found', 404)
+    assert.strictEqual(err.status, 404)
+    assert.strictEqual(err.code, 'API_ERROR')
+    assert.strictEqual(err.name, 'ApiError')
+  })
+
+  test('AuthError should have AUTH_ERROR code', async () => {
+    const { AuthError } = await import('../../shared/errors')
+    const err = new AuthError('no key')
+    assert.strictEqual(err.code, 'AUTH_ERROR')
+    assert.strictEqual(err.name, 'AuthError')
+  })
+})
+
+suite('shared/constants', () => {
+  test('should export expected constants', async () => {
+    const constants = await import('../../shared/constants')
+    assert.strictEqual(typeof constants.DEBOUNCE_MS, 'number')
+    assert.strictEqual(typeof constants.CACHE_TTL_MS, 'number')
+    assert.strictEqual(typeof constants.MAX_CACHE_SIZE, 'number')
+    assert.strictEqual(typeof constants.API_TIMEOUT_MS, 'number')
+    assert.strictEqual(typeof constants.CONFIG_SECTION, 'string')
+    assert.strictEqual(constants.CONFIG_SECTION, 'linkcode')
+  })
+})
+
+suite('utils/crypto', () => {
+  test('getNonce should return 32-char alphanumeric string', async () => {
+    const { getNonce } = await import('../../utils/crypto')
+    const nonce = getNonce()
+    assert.strictEqual(nonce.length, 32)
+    assert.match(nonce, /^[A-Za-z0-9]+$/)
+  })
+
+  test('getNonce should return different values each call', async () => {
+    const { getNonce } = await import('../../utils/crypto')
+    const a = getNonce()
+    const b = getNonce()
+    assert.notStrictEqual(a, b)
   })
 })
