@@ -11,6 +11,7 @@ const { highlight } = useHighlight()
 
 const highlightedHtml = ref('')
 const buttonText = ref('Copy')
+const applyText = ref('Apply')
 
 async function doHighlight() {
   highlightedHtml.value = await highlight(props.code, props.language ?? '')
@@ -34,15 +35,26 @@ async function handleCopy() {
     }, 2000)
   }
 }
+function handleApply() {
+  applyText.value = 'Applied ✓'
+  setTimeout(() => {
+    applyText.value = 'Apply'
+  }, 2000)
+}
 </script>
 
 <template>
   <div class="code-block-wrapper">
     <div class="code-block-header">
       <span class="code-block-lang">{{ language ?? 'text' }}</span>
-      <button class="code-block-copy" @click="handleCopy">
-        {{ buttonText }}
-      </button>
+      <div class="code-block-actions">
+        <button class="code-block-copy" @click="handleCopy">
+          {{ buttonText }}
+        </button>
+        <button class="code-block-apply" @click="handleApply">
+          {{ applyText }}
+        </button>
+      </div>
     </div>
     <div
       class="code-block-body"

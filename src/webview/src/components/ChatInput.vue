@@ -111,6 +111,7 @@ function getModelClass(modelId?: string): string {
           {{ getModelPrefix(currentModel) }}
         </span>
         <span>{{ getModelDisplayName(currentModel) }}</span>
+        <span v-if="!currentModel || currentModel === 'auto'" class="routing-badge">Auto</span>
       </button>
     </div>
   </div>

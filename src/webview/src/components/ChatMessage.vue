@@ -6,6 +6,9 @@ const props = defineProps<{
   role: 'user' | 'assistant'
   content: string
   model?: string
+  cost?: string
+  savings?: string
+  tokenCount?: number
 }>()
 
 const { renderMarkdown } = useMarkdown()
@@ -45,6 +48,11 @@ watch(() => props.content, render)
       <div v-else class="user-text">
         {{ content }}
       </div>
+    </div>
+    <!-- Cost display for AI messages -->
+    <div v-if="role === 'assistant' && cost" class="msg-cost">
+      <span>💰 {{ cost }}</span>
+      <span v-if="savings" class="msg-cost-save">{{ savings }}</span>
     </div>
   </div>
 </template>

@@ -4,8 +4,10 @@ import { ref, computed } from 'vue'
 const emit = defineEmits<{
   close: []
   newChat: []
+  selectSession: [id: string]
 }>()
 
+const activeSessionId = ref('1') // current session
 const searchQuery = ref('')
 
 interface HistoryItem {
@@ -108,6 +110,8 @@ const filteredGroups = computed(() => {
             v-for="item in group.items"
             :key="item.id"
             class="history-item"
+            :class="{ active: item.id === activeSessionId }"
+            @click="activeSessionId = item.id; emit('selectSession', item.id)"
           >
             <div class="history-icon-box">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

@@ -155,6 +155,9 @@ function handleOpenSettings() {
         :role="msg.role"
         :content="msg.content"
         :model="currentModel"
+        :cost="msg.cost"
+        :savings="msg.savings"
+        :token-count="msg.tokenCount"
       />
 
       <!-- Thinking indicator -->

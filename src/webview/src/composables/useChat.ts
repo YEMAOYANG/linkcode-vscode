@@ -5,6 +5,9 @@ export interface ChatMsg {
   id: string
   role: 'user' | 'assistant'
   content: string
+  cost?: string
+  savings?: string
+  tokenCount?: number
 }
 
 function generateId(): string {
@@ -37,6 +40,8 @@ export function useChat() {
         language?: string
         messages?: ChatMsg[]
         modelId?: string
+        cost?: string
+        savings?: string
       }
 
       switch (msg.type) {
@@ -77,6 +82,14 @@ export function useChat() {
 
         case 'stream_end':
           isLoading.value = false
+          // Attach cost info if provided
+          if (msg.cost) {
+            const last = messages.value[messages.value.length - 1]
+            if (last && last.role === 'assistant') {
+              last.cost = msg.cost as string
+              if (msg.savings) last.savings = msg.savings as string
+            }
+          }
           break
 
         case 'stream_error':
