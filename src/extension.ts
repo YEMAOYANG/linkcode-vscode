@@ -45,7 +45,7 @@ export function activate(context: vscode.ExtensionContext): void {
   )
 
   // Chat WebView
-  const chatProvider = new ChatViewProvider(context.extensionUri, apiClient)
+  const chatProvider = new ChatViewProvider(context.extensionUri, apiClient, context.globalState)
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       'linkcode.chatView',

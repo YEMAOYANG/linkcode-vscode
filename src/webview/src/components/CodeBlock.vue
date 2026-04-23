@@ -1,12 +1,24 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, onMounted } from 'vue'
+import { useHighlight } from '../composables/useHighlight'
 
 const props = defineProps<{
   code: string
   language?: string
 }>()
 
+const { highlight } = useHighlight()
+
+const highlightedHtml = ref('')
 const buttonText = ref('Copy')
+
+async function doHighlight() {
+  highlightedHtml.value = await highlight(props.code, props.language ?? '')
+}
+
+onMounted(doHighlight)
+
+watch(() => [props.code, props.language], doHighlight)
 
 async function handleCopy() {
   try {
@@ -25,16 +37,16 @@ async function handleCopy() {
 </script>
 
 <template>
-  <div class="bg-code-bg rounded-sm overflow-hidden my-1">
-    <div class="flex justify-between items-center px-2 py-1 bg-white/[0.04] text-[11px]">
-      <span class="opacity-60 uppercase">{{ language ?? 'text' }}</span>
-      <button
-        class="bg-transparent border-none text-link cursor-pointer text-[11px]"
-        @click="handleCopy"
-      >
+  <div class="code-block-wrapper">
+    <div class="code-block-header">
+      <span class="code-block-lang">{{ language ?? 'text' }}</span>
+      <button class="code-block-copy" @click="handleCopy">
         {{ buttonText }}
       </button>
     </div>
-    <pre class="p-2 overflow-x-auto text-[length:var(--vscode-editor-font-size,_13px)] leading-relaxed m-0" style="font-family: var(--vscode-editor-font-family, 'Fira Code', monospace)"><code>{{ code }}</code></pre>
+    <div
+      class="code-block-body"
+      v-html="highlightedHtml"
+    />
   </div>
 </template>

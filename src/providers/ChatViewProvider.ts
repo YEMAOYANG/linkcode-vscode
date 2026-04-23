@@ -5,6 +5,14 @@ import type { ApiClient } from '../api/client'
 import { getNonce } from '../utils/crypto'
 import { Logger } from '../utils/logger'
 
+const HISTORY_KEY = 'linkcode.chatHistory'
+
+interface StoredMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+}
+
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'linkcode.chatView'
 
@@ -14,7 +22,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   constructor(
     private readonly extensionUri: vscode.Uri,
-    private readonly apiClient: ApiClient
+    private readonly apiClient: ApiClient,
+    private readonly globalState: vscode.Memento
   ) {}
 
   public resolveWebviewView(
@@ -42,6 +51,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case 'ready':
           // WebView is ready
           break
+        case 'getHistory':
+          this._sendHistory()
+          break
+        case 'saveMessages':
+          this._saveHistory(msg.messages)
+          break
       }
     })
   }
@@ -51,6 +66,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   public postMessage(message: ExtToWebMsg): void {
     this._view?.webview.postMessage(message)
+  }
+
+  /** Load persisted messages and send to webview */
+  private _sendHistory(): void {
+    const stored = this.globalState.get<StoredMessage[]>(HISTORY_KEY, [])
+    this._view?.webview.postMessage({
+      type: 'loadHistory',
+      messages: stored,
+    })
+  }
+
+  /** Save messages from webview to globalState */
+  private _saveHistory(messages: StoredMessage[]): void {
+    this.globalState.update(HISTORY_KEY, messages)
   }
 
   private async _handleSendMessage(text: string): Promise<void> {

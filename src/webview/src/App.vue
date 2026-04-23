@@ -28,49 +28,64 @@ watch(
   },
   { deep: true }
 )
+
+const quickPrompts = [
+  { icon: '💡', text: 'Explain this code' },
+  { icon: '🔧', text: 'Fix the bug in my selection' },
+  { icon: '📝', text: 'Write unit tests' },
+  { icon: '♻️', text: 'Refactor for readability' },
+]
+
+function handleQuickPrompt(text: string) {
+  handleSend(text)
+}
 </script>
 
 <template>
-  <div class="flex flex-col h-screen bg-bg text-fg text-[length:var(--vscode-font-size,_13px)]" style="font-family: var(--vscode-font-family, 'Segoe UI', sans-serif)">
+  <div class="chat-container">
+    <!-- Messages area -->
     <div
       ref="messagesListRef"
-      class="flex-1 overflow-y-auto p-2"
+      class="chat-messages"
     >
+      <!-- Empty state -->
+      <div v-if="messages.length === 0" class="empty-state">
+        <div class="empty-icon">🤖</div>
+        <div class="empty-title">LinkCode AI</div>
+        <div class="empty-subtitle">Ask me anything about your code…</div>
+        <div class="quick-prompts">
+          <button
+            v-for="prompt in quickPrompts"
+            :key="prompt.text"
+            class="quick-prompt-btn"
+            @click="handleQuickPrompt(prompt.text)"
+          >
+            <span class="quick-prompt-icon">{{ prompt.icon }}</span>
+            <span>{{ prompt.text }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Message list -->
       <ChatMessage
         v-for="msg in messages"
         :key="msg.id"
         :role="msg.role"
         :content="msg.content"
       />
-      <div
-        v-if="isLoading"
-        class="flex gap-1 px-3 py-2"
-      >
-        <span class="size-1.5 rounded-full bg-fg opacity-40 animate-[blink_1.4s_infinite_both]" />
-        <span class="size-1.5 rounded-full bg-fg opacity-40 animate-[blink_1.4s_infinite_both_0.2s]" />
-        <span class="size-1.5 rounded-full bg-fg opacity-40 animate-[blink_1.4s_infinite_both_0.4s]" />
+
+      <!-- Typing indicator -->
+      <div v-if="isLoading" class="typing-indicator">
+        <div class="typing-avatar">🤖</div>
+        <div class="typing-dots">
+          <span class="typing-dot" />
+          <span class="typing-dot" />
+          <span class="typing-dot" />
+        </div>
       </div>
     </div>
+
+    <!-- Input -->
     <ChatInput :disabled="isLoading" @send="handleSend" />
   </div>
 </template>
-
-<style>
-/* Global reset — keep minimal, Tailwind preflight handles most */
-*,
-*::before,
-*::after {
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  background: var(--color-bg);
-  color: var(--color-fg);
-}
-
-@keyframes blink {
-  0%, 80%, 100% { opacity: 0.4; }
-  40% { opacity: 1; }
-}
-</style>

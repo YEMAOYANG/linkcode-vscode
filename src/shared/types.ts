@@ -13,6 +13,15 @@ export interface CodeContext {
 }
 
 /**
+ * Stored chat message shape (shared between extension host and webview).
+ */
+export interface StoredChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+}
+
+/**
  * Messages sent from the Extension Host to the WebView.
  */
 export type ExtToWebMsg =
@@ -23,6 +32,7 @@ export type ExtToWebMsg =
   | { type: 'inline_edit'; code: string; language: string }
   | { type: 'code_review'; code: string }
   | { type: 'user_action'; action: 'explain' | 'refactor' | 'review'; payload: string }
+  | { type: 'loadHistory'; messages: StoredChatMessage[] }
 
 /**
  * Messages sent from the WebView to the Extension Host.
@@ -32,3 +42,5 @@ export type WebToExtMsg =
   | { type: 'getApiKey' }
   | { type: 'applyEdit'; code: string }
   | { type: 'ready' }
+  | { type: 'getHistory' }
+  | { type: 'saveMessages'; messages: StoredChatMessage[] }

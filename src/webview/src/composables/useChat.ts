@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useVSCode } from './useVSCode'
 
 export interface ChatMsg {
@@ -14,15 +14,33 @@ function generateId(): string {
 export function useChat() {
   const messages = ref<ChatMsg[]>([])
   const isLoading = ref(false)
-  const { onMessage } = useVSCode()
+  const { onMessage, postMessage } = useVSCode()
 
   let cleanup: (() => void) | undefined
+  let historyLoaded = false
 
   onMounted(() => {
+    // Request chat history from extension host on startup
+    postMessage({ type: 'getHistory' })
+
     cleanup = onMessage((event: MessageEvent) => {
-      const msg = event.data as { type: string; payload?: string; action?: string; error?: string }
+      const msg = event.data as {
+        type: string
+        payload?: string
+        action?: string
+        error?: string
+        messages?: ChatMsg[]
+      }
 
       switch (msg.type) {
+        case 'loadHistory':
+          // Restore history from extension globalState
+          if (msg.messages && Array.isArray(msg.messages)) {
+            messages.value = msg.messages
+            historyLoaded = true
+          }
+          break
+
         case 'assistantMessage':
           messages.value.push({
             id: generateId(),
@@ -67,6 +85,17 @@ export function useChat() {
   onUnmounted(() => {
     cleanup?.()
   })
+
+  // Persist messages to extension host whenever they change
+  watch(
+    messages,
+    (newMessages) => {
+      if (historyLoaded || newMessages.length > 0) {
+        postMessage({ type: 'saveMessages', messages: newMessages })
+      }
+    },
+    { deep: true }
+  )
 
   function sendMessage(text: string) {
     messages.value.push({ id: generateId(), role: 'user', content: text })
