@@ -37,6 +37,7 @@ export async function* parseSSEStream(
 
   const decoder = new TextDecoder()
   let buffer = ''
+  let lastUsage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined
 
   try {
     while (true) {
@@ -85,8 +86,13 @@ export async function* parseSSEStream(
               yield { type: 'token', content: delta.content }
             }
 
+            // Capture usage from the chunk (often present in the last chunk)
+            if (chunk.usage) {
+              lastUsage = chunk.usage
+            }
+
             if (finishReason === 'stop' || finishReason === 'length') {
-              yield { type: 'done' }
+              yield { type: 'done', usage: lastUsage }
               return
             }
           } catch {
@@ -96,7 +102,7 @@ export async function* parseSSEStream(
       }
     }
 
-    yield { type: 'done' }
+    yield { type: 'done', usage: lastUsage }
   } finally {
     reader.releaseLock()
   }

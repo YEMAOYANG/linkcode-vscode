@@ -8,7 +8,7 @@ export function registerCommands(
   chatProvider: ChatViewProvider,
   secretStore: SecretStore
 ): void {
-  // Set API Key
+  // Set API Key (interactive dialog)
   context.subscriptions.push(
     vscode.commands.registerCommand('linkcode.setApiKey', async () => {
       const key = await vscode.window.showInputBox({
@@ -25,6 +25,15 @@ export function registerCommands(
           await secretStore.setApiKey(key)
           vscode.window.showInformationMessage('LinkCode: API Key saved.')
         }
+      }
+    })
+  )
+
+  // Set API Key directly (from WebView, no dialog)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('linkcode.setApiKeyDirect', async (key: string) => {
+      if (key) {
+        await secretStore.setApiKey(key)
       }
     })
   )

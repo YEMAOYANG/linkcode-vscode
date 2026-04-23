@@ -1,6 +1,14 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useVSCode } from './useVSCode'
 
+export interface SessionStats {
+  totalTokens: number
+  promptTokens: number
+  completionTokens: number
+  messageCount: number
+  estimatedCost: number // claude-sonnet ¥0.015/1K tokens
+}
+
 export interface ChatMsg {
   id: string
   role: 'user' | 'assistant'
@@ -39,6 +47,13 @@ export function useChat() {
   const currentModel = ref('claude-sonnet-4-6')
   const models = ref<ModelInfo[]>(FALLBACK_MODELS)
   const modelsLoading = ref(true)
+  const sessionStats = ref<SessionStats>({
+    totalTokens: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    messageCount: 0,
+    estimatedCost: 0,
+  })
   const { onMessage, postMessage } = useVSCode()
 
   let cleanup: (() => void) | undefined
@@ -64,6 +79,11 @@ export function useChat() {
         modelId?: string
         cost?: string
         savings?: string
+        usage?: {
+          prompt_tokens?: number
+          completion_tokens?: number
+          total_tokens?: number
+        }
       }
 
       switch (msg.type) {
@@ -111,6 +131,16 @@ export function useChat() {
 
         case 'stream_end':
           isLoading.value = false
+          // Accumulate usage stats
+          if (msg.usage) {
+            const u = msg.usage
+            sessionStats.value.promptTokens += u.prompt_tokens ?? 0
+            sessionStats.value.completionTokens += u.completion_tokens ?? 0
+            sessionStats.value.totalTokens += u.total_tokens ?? 0
+            sessionStats.value.messageCount += 1
+            // Estimate cost at ¥0.015/1K tokens (claude-sonnet rate)
+            sessionStats.value.estimatedCost = sessionStats.value.totalTokens * 0.015 / 1000
+          }
           // Attach cost info if provided
           if (msg.cost) {
             const last = messages.value[messages.value.length - 1]
@@ -179,6 +209,7 @@ export function useChat() {
     currentModel,
     models,
     modelsLoading,
+    sessionStats,
     sendMessage,
     clearMessages,
     changeModel,

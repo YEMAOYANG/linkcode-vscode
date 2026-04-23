@@ -1,20 +1,40 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, computed } from 'vue'
+import { ref, watch, nextTick, computed, onMounted, onUnmounted } from 'vue'
 import ChatMessage from './components/ChatMessage.vue'
 import ChatInput from './components/ChatInput.vue'
 import ModelSelector from './components/ModelSelector.vue'
 import SessionHistory from './components/SessionHistory.vue'
+import Onboarding from './components/Onboarding.vue'
+import CostDashboard from './components/CostDashboard.vue'
+import Settings from './components/Settings.vue'
 import { useChat } from './composables/useChat'
 import { useVSCode } from './composables/useVSCode'
 import { usePlatform } from './composables/usePlatform'
 
-const { messages, sendMessage, isLoading, currentModel, models, modelsLoading, changeModel, clearMessages } = useChat()
-const { postMessage } = useVSCode()
+const { messages, sendMessage, isLoading, currentModel, models, modelsLoading, changeModel, clearMessages, sessionStats } = useChat()
+const { postMessage, onMessage } = useVSCode()
 const { modKey } = usePlatform()
 
 const messagesListRef = ref<HTMLElement | null>(null)
 const showModelSelector = ref(false)
 const showHistory = ref(false)
+const showOnboarding = ref(false)
+const showCostDashboard = ref(false)
+const showSettings = ref(false)
+
+// Listen for onboarding trigger from extension host
+let cleanupOnboarding: (() => void) | undefined
+onMounted(() => {
+  cleanupOnboarding = onMessage((event: MessageEvent) => {
+    const msg = event.data as { type: string }
+    if (msg.type === 'show_onboarding') {
+      showOnboarding.value = true
+    }
+  })
+})
+onUnmounted(() => {
+  cleanupOnboarding?.()
+})
 
 const isEmpty = computed(() => messages.value.length === 0)
 
@@ -59,8 +79,11 @@ function handleModelChange(modelId: string) {
 }
 
 function handleOpenSettings() {
-  // We could open VS Code settings, but for now just log
-  postMessage({ type: 'getApiKey' })
+  showSettings.value = true
+}
+
+function handleOnboardingComplete() {
+  showOnboarding.value = false
 }
 </script>
 
@@ -69,12 +92,21 @@ function handleOpenSettings() {
     <!-- Header -->
     <header class="chat-header">
       <div class="header-left">
-        <svg class="header-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3l1.912 5.813a2 2 0 001.272 1.278L21 12l-5.816 1.91a2 2 0 00-1.272 1.277L12 21l-1.912-5.813a2 2 0 00-1.272-1.278L3 12l5.816-1.91a2 2 0 001.272-1.277z" />
+        <svg class="header-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-button-bg)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
+          <path d="M20 3v4"/><path d="M22 5h-4"/>
+          <path d="M4 17v2"/><path d="M5 18H3"/>
         </svg>
         <span class="header-title">LinkCode</span>
       </div>
       <div class="header-right">
+        <button
+          class="header-btn cost-btn"
+          title="费用看板"
+          @click="showCostDashboard = !showCostDashboard"
+        >
+          <span class="cost-btn-text">¥{{ sessionStats.estimatedCost.toFixed(2) }}</span>
+        </button>
         <button
           v-if="!isEmpty"
           class="header-btn"
@@ -117,8 +149,10 @@ function handleOpenSettings() {
       <!-- Empty state -->
       <div v-if="isEmpty" class="empty-state">
         <div class="empty-logo">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3l1.912 5.813a2 2 0 001.272 1.278L21 12l-5.816 1.91a2 2 0 00-1.272 1.277L12 21l-1.912-5.813a2 2 0 00-1.272-1.278L3 12l5.816-1.91a2 2 0 001.272-1.277z" />
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-button-bg)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
+            <path d="M20 3v4"/><path d="M22 5h-4"/>
+            <path d="M4 17v2"/><path d="M5 18H3"/>
           </svg>
         </div>
         <div class="empty-title">LinkCode AI</div>
@@ -165,7 +199,13 @@ function handleOpenSettings() {
       <!-- Thinking indicator -->
       <div v-if="isLoading" class="thinking-msg">
         <div class="msg-header">
-          <div class="msg-avatar ai">✦</div>
+          <div class="msg-avatar ai">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-button-bg)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
+              <path d="M20 3v4"/><path d="M22 5h-4"/>
+              <path d="M4 17v2"/><path d="M5 18H3"/>
+            </svg>
+          </div>
           <span class="msg-name ai-name">LinkCode</span>
           <span class="msg-meta">思考中</span>
         </div>
@@ -200,6 +240,29 @@ function handleOpenSettings() {
       v-if="showHistory"
       @close="showHistory = false"
       @new-chat="handleNewChat"
+    />
+
+    <!-- Onboarding overlay -->
+    <Onboarding
+      v-if="showOnboarding"
+      :models="models"
+      @complete="handleOnboardingComplete"
+      @skip="showOnboarding = false"
+    />
+
+    <!-- Cost Dashboard overlay -->
+    <CostDashboard
+      v-if="showCostDashboard"
+      :stats="sessionStats"
+      @close="showCostDashboard = false"
+    />
+
+    <!-- Settings overlay -->
+    <Settings
+      v-if="showSettings"
+      :current-model="currentModel"
+      :models="models"
+      @close="showSettings = false"
     />
   </div>
 </template>

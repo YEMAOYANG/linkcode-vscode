@@ -35,24 +35,8 @@ export function activate(context: vscode.ExtensionContext): void {
   // Centralized API client — single instance shared by all providers
   const apiClient = new ApiClient(getApiKey)
 
-  // Warn if API key is not set (check after seeding)
-  const apiKeyCheckTimer = setTimeout(() => {
-    void secretStore.getApiKey().then((key) => {
-      if (!key) {
-        void vscode.window
-          .showWarningMessage(
-            'LinkCode: API Key is not set. Please set it to use AI features.',
-            'Set API Key'
-          )
-          .then((choice) => {
-            if (choice === 'Set API Key') {
-              void vscode.commands.executeCommand('linkcode.setApiKey')
-            }
-          })
-      }
-    })
-  }, API_KEY_CHECK_DELAY_MS)
-  context.subscriptions.push({ dispose: () => clearTimeout(apiKeyCheckTimer) })
+  // Onboarding is now handled by the WebView via show_onboarding message.
+  // The ChatViewProvider checks for API key on ready and sends the trigger.
 
   // Inline Completion (Ghost Text)
   const inlineProvider = new InlineCompletionProvider(apiClient)

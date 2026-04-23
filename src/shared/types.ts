@@ -37,7 +37,7 @@ export interface ApiModelInfo {
 export type ExtToWebMsg =
   | { type: 'stream_start' }
   | { type: 'stream_chunk'; content: string }
-  | { type: 'stream_end' }
+  | { type: 'stream_end'; usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number } }
   | { type: 'stream_error'; message: string }
   | { type: 'inline_edit'; code: string; language: string }
   | { type: 'code_review'; code: string }
@@ -46,6 +46,8 @@ export type ExtToWebMsg =
   | { type: 'modelInfo'; modelId: string }
   | { type: 'modelList'; models: ApiModelInfo[] }
   | { type: 'chatCleared' }
+  | { type: 'show_onboarding' }
+  | { type: 'apiKeyValidated'; success: boolean; message?: string }
 
 /**
  * Messages sent from the WebView to the Extension Host.
@@ -59,3 +61,7 @@ export type WebToExtMsg =
   | { type: 'saveMessages'; messages: StoredChatMessage[] }
   | { type: 'changeModel'; modelId: string }
   | { type: 'newChat' }
+  | { type: 'setApiKey'; key: string }
+  | { type: 'validateApiKey'; key: string }
+  | { type: 'updateConfig'; key: string; value: unknown }
+  | { type: 'onboardingComplete' }

@@ -125,6 +125,19 @@ body {
   color: var(--lc-text-primary);
 }
 
+.cost-btn {
+  width: auto;
+  padding: 0 8px;
+  font-size: 10px;
+  gap: 4px;
+}
+
+.cost-btn-text {
+  font-family: var(--lc-font-code);
+  color: var(--lc-accent-text);
+  font-size: 10px;
+}
+
 /* ─── Chat Messages ─── */
 .chat-messages {
   flex: 1;

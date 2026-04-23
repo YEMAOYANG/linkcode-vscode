@@ -45,9 +45,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this._handleSendMessage(msg.text)
           break
         case 'ready':
-          // WebView is ready — send current model info and fetch model list
+          // WebView is ready — send current model info, fetch models, check onboarding
           this._sendModelInfo()
           this._fetchModels()
+          this._checkOnboarding()
           break
         case 'getHistory':
           this._sendHistory()
@@ -63,6 +64,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break
         case 'applyEdit':
           this._handleApplyEdit(msg.code)
+          break
+        case 'setApiKey':
+          this._handleSetApiKey(msg.key)
+          break
+        case 'validateApiKey':
+          this._handleValidateApiKey(msg.key)
+          break
+        case 'updateConfig':
+          this._handleUpdateConfig(msg.key, msg.value)
+          break
+        case 'onboardingComplete':
+          // Extension can react to onboarding completion if needed
           break
       }
     })
@@ -294,6 +307,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     try {
       let assistantContent = ''
+      let lastUsage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined
 
       for await (const chunk of this.apiClient.streamChat(
         this._chatHistory,
@@ -310,13 +324,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           logger.error(`Stream error: ${chunk.error}`)
           return
         } else if (chunk.type === 'done') {
+          if (chunk.usage) {
+            lastUsage = chunk.usage
+          }
           break
         }
       }
 
       // Save assistant response to history
       this._chatHistory.push({ role: 'assistant', content: assistantContent })
-      this.postMessage({ type: 'stream_end' })
+      this.postMessage({ type: 'stream_end', usage: lastUsage })
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
         this.postMessage({ type: 'stream_end' })
@@ -326,6 +343,74 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.postMessage({ type: 'stream_error', message: errorMessage })
       logger.error('Chat stream failed', err)
     }
+  }
+
+  /** Check if onboarding should be shown (no API key set) */
+  private async _checkOnboarding(): Promise<void> {
+    try {
+      const apiKey = await this.apiClient.resolveApiKey()
+      if (!apiKey) {
+        this.postMessage({ type: 'show_onboarding' })
+      }
+    } catch {
+      this.postMessage({ type: 'show_onboarding' })
+    }
+  }
+
+  /** Handle setApiKey from WebView (onboarding / settings) */
+  private _handleSetApiKey(key: string): void {
+    void vscode.commands.executeCommand('linkcode.setApiKeyDirect', key)
+  }
+
+  /** Handle validateApiKey — test against /v1/models */
+  private async _handleValidateApiKey(key: string): Promise<void> {
+    const logger = Logger.getInstance()
+    const config = vscode.workspace.getConfiguration(CONFIG_SECTION)
+    const endpoint = config.get<string>('apiEndpoint') ?? DEFAULT_API_ENDPOINT
+
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), MODEL_FETCH_TIMEOUT_MS)
+
+      try {
+        const res = await fetch(`${endpoint}/v1/models`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${key}`,
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        })
+
+        if (res.ok) {
+          this.postMessage({ type: 'apiKeyValidated', success: true })
+          // Also fetch models with the new key
+          const data = (await res.json()) as { data?: Array<{ id: string }> }
+          if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+            const models: ApiModelInfo[] = data.data.map((m) => ({
+              id: m.id,
+              label: m.id,
+              provider: ChatViewProvider._inferProvider(m.id),
+            }))
+            this.postMessage({ type: 'modelList', models })
+          }
+        } else {
+          this.postMessage({ type: 'apiKeyValidated', success: false, message: `HTTP ${res.status}` })
+        }
+      } finally {
+        clearTimeout(timeout)
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      logger.error('[validateApiKey] Failed', err)
+      this.postMessage({ type: 'apiKeyValidated', success: false, message })
+    }
+  }
+
+  /** Handle config update from WebView (settings page) */
+  private _handleUpdateConfig(key: string, value: unknown): void {
+    const config = vscode.workspace.getConfiguration(CONFIG_SECTION)
+    void Promise.resolve(config.update(key, value, vscode.ConfigurationTarget.Global))
   }
 
   private _getHtml(webview: vscode.Webview): string {
