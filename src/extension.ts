@@ -8,8 +8,6 @@ import { SecretStore } from './utils/secretStorage'
 import { ApiClient } from './api/client'
 import { SECRET_KEY_API } from './shared/constants'
 
-const API_KEY_CHECK_DELAY_MS = 500
-
 export function activate(context: vscode.ExtensionContext): void {
   const logger = Logger.getInstance(context)
   logger.info('LinkCode extension activated')
@@ -33,10 +31,18 @@ export function activate(context: vscode.ExtensionContext): void {
   })
 
   // Centralized API client — single instance shared by all providers
-  const apiClient = new ApiClient(getApiKey)
+  const apiClient = new ApiClient(getApiKey, secretStore)
 
   // Onboarding is now handled by the WebView via show_onboarding message.
   // The ChatViewProvider checks for API key on ready and sends the trigger.
+
+  // Status Bar — Ghost Text indicator
+  const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100)
+  statusBar.text = '$(sparkle) LinkCode'
+  statusBar.tooltip = 'LinkCode: Ready — Click to toggle inline completion'
+  statusBar.command = 'linkcode.toggleCompletion'
+  statusBar.show()
+  context.subscriptions.push(statusBar)
 
   // Inline Completion (Ghost Text)
   const inlineProvider = new InlineCompletionProvider(apiClient)
@@ -48,8 +54,20 @@ export function activate(context: vscode.ExtensionContext): void {
     )
   )
 
+  // Update status bar when completion state changes
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('linkcode.enableInlineCompletion')) {
+        const enabled = vscode.workspace.getConfiguration('linkcode').get<boolean>('enableInlineCompletion', true)
+        statusBar.text = enabled ? '$(sparkle) LinkCode' : '$(circle-slash) LinkCode'
+        statusBar.tooltip = `LinkCode: ${enabled ? 'Ready' : 'Completion Off'} — Click to toggle`
+      }
+    })
+  )
+
   // Chat WebView
   const chatProvider = new ChatViewProvider(context.extensionUri, apiClient, context.globalState)
+  chatProvider.setSecretStore(secretStore)
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       'linkcode.chatView',

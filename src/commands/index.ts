@@ -45,6 +45,15 @@ export function registerCommands(
     })
   )
 
+  // Toggle Inline Completion on/off
+  context.subscriptions.push(
+    vscode.commands.registerCommand('linkcode.toggleCompletion', () => {
+      const config = vscode.workspace.getConfiguration('linkcode')
+      const current = config.get<boolean>('enableInlineCompletion', true)
+      void config.update('enableInlineCompletion', !current, vscode.ConfigurationTarget.Global)
+    })
+  )
+
   // Accept Completion (handled natively by VS Code inline suggestions)
   context.subscriptions.push(
     vscode.commands.registerCommand('linkcode.acceptCompletion', () => {

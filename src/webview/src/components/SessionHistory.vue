@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useVSCode } from '../composables/useVSCode'
 
 const emit = defineEmits<{
   close: []
@@ -7,63 +8,94 @@ const emit = defineEmits<{
   selectSession: [id: string]
 }>()
 
-const activeSessionId = ref('1') // current session
+const { postMessage, onMessage } = useVSCode()
+
+const activeSessionId = ref('')
 const searchQuery = ref('')
 
-interface HistoryItem {
+interface SessionSummary {
   id: string
   title: string
-  model: string
-  time: string
-  cost: string
-  icon: string
+  messageCount: number
+  timestamp: number
+  model?: string
 }
 
 interface HistoryGroup {
   label: string
-  items: HistoryItem[]
+  items: SessionSummary[]
 }
 
-// Mock data — in real app this would come from extension host
-const historyGroups: HistoryGroup[] = [
-  {
-    label: '今天',
-    items: [
-      { id: '1', title: 'React useDebounce hook 实现', model: 'DeepSeek-V3', time: '14:32', cost: '¥0.002', icon: 'code' },
-      { id: '2', title: 'Express rate limiter 中间件配置', model: 'Claude Sonnet 4', time: '13:15', cost: '¥0.018', icon: 'server' },
-      { id: '3', title: 'TypeScript 泛型约束最佳实践', model: 'DeepSeek-V3', time: '11:42', cost: '¥0.003', icon: 'type' },
-    ],
-  },
-  {
-    label: '昨天',
-    items: [
-      { id: '4', title: '设计 REST API 路由结构', model: 'GPT-4o', time: '昨天 18:20', cost: '¥0.024', icon: 'globe' },
-      { id: '5', title: 'Docker 多阶段构建优化', model: 'Qwen2.5-Coder', time: '昨天 15:08', cost: '¥0.004', icon: 'box' },
-    ],
-  },
-  {
-    label: '本周',
-    items: [
-      { id: '6', title: 'Prisma Schema 关系定义', model: 'DeepSeek-V3', time: '4月19日', cost: '¥0.005', icon: 'database' },
-      { id: '7', title: 'Jest 单元测试 Mock 配置', model: 'Qwen2.5-Coder', time: '4月18日', cost: '¥0.006', icon: 'check' },
-    ],
-  },
-]
+const sessions = ref<SessionSummary[]>([])
+let cleanup: (() => void) | undefined
 
-const filteredGroups = computed(() => {
-  const q = searchQuery.value.toLowerCase()
-  if (!q) return historyGroups
-  return historyGroups
-    .map((g) => ({
-      ...g,
-      items: g.items.filter(
-        (item) =>
-          item.title.toLowerCase().includes(q) ||
-          item.model.toLowerCase().includes(q)
-      ),
-    }))
-    .filter((g) => g.items.length > 0)
+onMounted(() => {
+  postMessage({ type: 'getSessionHistory' })
+  cleanup = onMessage((event: MessageEvent) => {
+    const msg = event.data as { type: string; sessions?: SessionSummary[] }
+    if (msg.type === 'historyList' && msg.sessions) {
+      sessions.value = msg.sessions
+    }
+  })
 })
+
+onUnmounted(() => {
+  cleanup?.()
+})
+
+function formatTime(ts: number): string {
+  const date = new Date(ts)
+  const now = new Date()
+  const isToday = date.toDateString() === now.toDateString()
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const isYesterday = date.toDateString() === yesterday.toDateString()
+
+  const time = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  if (isToday) return time
+  if (isYesterday) return `昨天 ${time}`
+  return date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
+}
+
+function getGroupLabel(ts: number): string {
+  const date = new Date(ts)
+  const now = new Date()
+  if (date.toDateString() === now.toDateString()) return '今天'
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (date.toDateString() === yesterday.toDateString()) return '昨天'
+  const weekAgo = new Date(now)
+  weekAgo.setDate(weekAgo.getDate() - 7)
+  if (date > weekAgo) return '本周'
+  return '更早'
+}
+
+const filteredGroups = computed<HistoryGroup[]>(() => {
+  const q = searchQuery.value.toLowerCase()
+  const filtered = q
+    ? sessions.value.filter(s => s.title.toLowerCase().includes(q) || (s.model && s.model.toLowerCase().includes(q)))
+    : sessions.value
+
+  const groupMap = new Map<string, SessionSummary[]>()
+  for (const s of filtered) {
+    const label = getGroupLabel(s.timestamp)
+    const items = groupMap.get(label) ?? []
+    items.push(s)
+    groupMap.set(label, items)
+  }
+
+  const order = ['今天', '昨天', '本周', '更早']
+  return order
+    .filter(label => groupMap.has(label))
+    .map(label => ({ label, items: groupMap.get(label)! }))
+})
+
+function handleSelectSession(id: string) {
+  activeSessionId.value = id
+  postMessage({ type: 'loadSession', sessionId: id })
+  emit('selectSession', id)
+  emit('close')
+}
 </script>
 
 <template>
@@ -104,6 +136,9 @@ const filteredGroups = computed(() => {
 
       <!-- List -->
       <div class="history-list">
+        <template v-if="filteredGroups.length === 0">
+          <div class="history-empty">暂无会话历史</div>
+        </template>
         <template v-for="group in filteredGroups" :key="group.label">
           <div class="history-group-label">{{ group.label }}</div>
           <button
@@ -111,32 +146,19 @@ const filteredGroups = computed(() => {
             :key="item.id"
             class="history-item"
             :class="{ active: item.id === activeSessionId }"
-            @click="activeSessionId = item.id; emit('selectSession', item.id)"
+            @click="handleSelectSession(item.id)"
           >
             <div class="history-icon-box">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline v-if="item.icon === 'code'" points="16 18 22 12 16 6" />
-                <polyline v-if="item.icon === 'code'" points="8 6 2 12 8 18" />
-                <rect v-if="item.icon === 'server'" x="2" y="2" width="20" height="8" rx="2" ry="2" />
-                <rect v-if="item.icon === 'server'" x="2" y="14" width="20" height="8" rx="2" ry="2" />
-                <path v-if="item.icon === 'type'" d="M4 7V4h16v3" />
-                <line v-if="item.icon === 'type'" x1="12" y1="4" x2="12" y2="20" />
-                <line v-if="item.icon === 'type'" x1="8" y1="20" x2="16" y2="20" />
-                <circle v-if="item.icon === 'globe'" cx="12" cy="12" r="10" />
-                <line v-if="item.icon === 'globe'" x1="2" y1="12" x2="22" y2="12" />
-                <rect v-if="item.icon === 'box'" x="2" y="4" width="20" height="16" rx="2" ry="2" />
-                <ellipse v-if="item.icon === 'database'" cx="12" cy="5" rx="9" ry="3" />
-                <path v-if="item.icon === 'database'" d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-                <path v-if="item.icon === 'database'" d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-                <polyline v-if="item.icon === 'check'" points="22 11.08 12 21.08 7 16.08" />
+                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
               </svg>
             </div>
             <div class="history-info">
               <div class="history-title">{{ item.title }}</div>
               <div class="history-meta">
-                <span>{{ item.model }}</span>
-                <span>{{ item.time }}</span>
-                <span>{{ item.cost }}</span>
+                <span v-if="item.model">{{ item.model }}</span>
+                <span>{{ formatTime(item.timestamp) }}</span>
+                <span>{{ item.messageCount }} 条消息</span>
               </div>
             </div>
           </button>

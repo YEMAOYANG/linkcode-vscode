@@ -40,6 +40,10 @@
       {
         "command": "linkcode.applyInlineEdit",
         "title": "LinkCode: Apply Inline Edit"
+      },
+      {
+        "command": "linkcode.toggleCompletion",
+        "title": "LinkCode: Toggle Inline Completion"
       }
     ],
     "keybindings": [

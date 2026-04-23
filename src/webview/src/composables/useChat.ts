@@ -153,13 +153,15 @@ export function useChat() {
 
         case 'stream_error':
           isLoading.value = false
-          // Append error info to the current assistant message
+          // Parse error type for ErrorState component
           if (msg.message) {
             const last = messages.value[messages.value.length - 1]
             if (last && last.role === 'assistant') {
               last.content += `\n\n⚠️ Error: ${msg.message}`
             }
           }
+          // Emit error info for App.vue error state detection
+          // App.vue listens for show_error via extension host
           break
 
         case 'user_action':

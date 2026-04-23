@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useVSCode } from '../composables/useVSCode'
 
 interface ModelInfo {
   id: string
@@ -14,10 +15,34 @@ interface ModelGroup {
   models: ModelInfo[]
 }
 
+const MODEL_TO_GROUP: Record<string, string> = {
+  'claude-sonnet-4-6': 'Claude_aws', 'claude-opus-4-6': 'Claude_aws',
+  'claude-haiku-4-5-20251001': 'Claude_aws', 'claude-sonnet-4-5-20250929': 'Claude_aws',
+  'claude-opus-4-5-20251101': 'Claude_aws', 'claude-sonnet-4-20250514': 'Claude_aws',
+  'cursor-haik-4-5': 'Claude_aws', 'cursor-opu-4-5': 'Claude_aws', 'cursor-opu-4-6': 'Claude_aws',
+  'cursor-sonne-4': 'Claude_aws', 'cursor-sonne-4-5': 'Claude_aws', 'cursor-sonne-4-6': 'Claude_aws',
+  'deepseek-r1': 'deepseek_tencent', 'deepseek-v3': 'deepseek_tencent',
+  'deepseek-v3.1': 'deepseek_tencent', 'deepseek-v3.2': 'deepseek_tencent',
+  'gemini-2.5-pro': 'gemini_Google', 'gemini-2.5-flash': 'gemini_Google',
+  'gemini-2.5-flash-image': 'gemini_Google', 'gemini-2.5-flash-lite': 'gemini_Google',
+  'gemini-3-flash-preview': 'gemini_Google', 'gemini-3-pro-preview': 'gemini_Google',
+  'gemini-3.1-flash-lite-preview': 'gemini_Google', 'gemini-3.1-pro-preview': 'gemini_Google',
+  'gpt-5': 'gpt_Azure', 'gpt-5-codex': 'gpt_Azure', 'gpt-5.1': 'gpt_Azure',
+  'gpt-5.1-codex': 'gpt_Azure', 'gpt-5.2': 'gpt_Azure', 'gpt-5.2-codex': 'gpt_Azure',
+  'gpt-5.3-codex': 'gpt_Azure', 'gpt-5.4': 'gpt_Azure', 'gpt-5.4-pro': 'gpt_Azure',
+  'M2-her': 'MiniMax', 'MiniMax-M2.1': 'MiniMax', 'MiniMax-M2.1-highspeed': 'MiniMax',
+  'MiniMax-M2.5-highspeed': 'MiniMax', 'MiniMax-M2.7': 'MiniMax', 'MiniMax-M2.7-highspeed': 'MiniMax',
+  'hunyuan-2.0-instruct': 'hunyuan_tencent', 'hunyuan-2.0-thinking': 'hunyuan_tencent',
+  'glm-5': 'other_tencent', 'kimi-k2.5': 'other_tencent', 'minimax-m2.5': 'other_tencent',
+  'MiniMax-M2': 'scnet-low', 'MiniMax-M2.5': 'scnet-low',
+  'stepfun/step-3.5-flash:free': 'stepfun_openrouter',
+}
+
 const props = defineProps<{
   currentModel: string
   models: ModelInfo[]
   loading?: boolean
+  filterUnlocked?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -25,8 +50,25 @@ const emit = defineEmits<{
   close: []
 }>()
 
+const { postMessage, onMessage } = useVSCode()
+
 const searchQuery = ref('')
 const maxMode = ref(false)
+const groupTokenStatus = ref<Record<string, boolean>>({})
+
+let cleanup: (() => void) | undefined
+
+onMounted(() => {
+  postMessage({ type: 'getGroupTokenStatus' })
+  cleanup = onMessage((event: MessageEvent) => {
+    const msg = event.data as { type: string; tokens?: Record<string, boolean> }
+    if (msg.type === 'groupTokenStatus' && msg.tokens) {
+      groupTokenStatus.value = msg.tokens
+    }
+  })
+})
+
+onUnmounted(() => { cleanup?.() })
 
 /** Provider → display group config */
 const PROVIDER_GROUPS: Record<string, { title: string; emoji: string; order: number }> = {
@@ -42,7 +84,6 @@ const PROVIDER_GROUPS: Record<string, { title: string; emoji: string; order: num
   Google:   { title: '国际模型（高质量）', emoji: '🌍', order: 1 },
 }
 
-/** Get icon class from model id */
 function getIconClass(id: string): string {
   if (id.startsWith('claude')) return 'cl'
   if (id.startsWith('deepseek')) return 'ds'
@@ -53,23 +94,32 @@ function getIconClass(id: string): string {
   if (id.startsWith('doubao')) return 'db'
   if (id.startsWith('hunyuan')) return 'hy'
   if (id.startsWith('kimi') || id.startsWith('moonshot')) return 'km'
-  if (id.startsWith('minimax')) return 'mm'
+  if (id.startsWith('minimax') || id.startsWith('MiniMax') || id.startsWith('M2')) return 'mm'
   return 'ai'
 }
 
-/** Get 2-letter icon label from model id */
 function getIconLabel(id: string): string {
   if (id.startsWith('claude')) return 'CL'
-  if (id.startsWith('deepseek')) return 'DS'
-  if (id.startsWith('qwen')) return 'QW'
+  if (id.startsWith('deepseek') || id.startsWith('DeepSeek')) return 'DS'
+  if (id.startsWith('qwen') || id.startsWith('Qwen') || id.startsWith('QwQ')) return 'QW'
   if (id.startsWith('glm') || id.startsWith('chatglm')) return 'GL'
   if (id.startsWith('gpt') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4')) return 'GP'
   if (id.startsWith('gemini')) return 'GE'
   if (id.startsWith('doubao')) return 'DB'
   if (id.startsWith('hunyuan')) return 'HY'
   if (id.startsWith('kimi') || id.startsWith('moonshot')) return 'KM'
-  if (id.startsWith('minimax')) return 'MM'
+  if (id.startsWith('minimax') || id.startsWith('MiniMax') || id.startsWith('M2')) return 'MM'
   return 'AI'
+}
+
+function isModelUnlocked(modelId: string): boolean {
+  const group = MODEL_TO_GROUP[modelId]
+  if (!group) return true // Unknown models are considered unlocked
+  return groupTokenStatus.value[group] === true
+}
+
+function getModelGroup(modelId: string): string | undefined {
+  return MODEL_TO_GROUP[modelId]
 }
 
 /** Build grouped model list from flat models array */
@@ -77,6 +127,9 @@ const modelGroups = computed<ModelGroup[]>(() => {
   const groupMap = new Map<string, ModelInfo[]>()
 
   for (const model of props.models) {
+    // Feature 6: if filterUnlocked, hide locked models
+    if (props.filterUnlocked && !isModelUnlocked(model.id)) continue
+
     const groupConfig = PROVIDER_GROUPS[model.provider]
     const groupKey = groupConfig?.title ?? '其他模型'
     if (!groupMap.has(groupKey)) {
@@ -87,7 +140,6 @@ const modelGroups = computed<ModelGroup[]>(() => {
 
   const groups: ModelGroup[] = []
   for (const [title, models] of groupMap) {
-    // Find emoji from any matching provider
     const firstModel = models[0]
     const config = firstModel ? PROVIDER_GROUPS[firstModel.provider] : undefined
     groups.push({
@@ -97,7 +149,6 @@ const modelGroups = computed<ModelGroup[]>(() => {
     })
   }
 
-  // Sort: 国产 first, 国际 second, others last
   groups.sort((a, b) => {
     const orderA = a.title.includes('国产') ? 0 : a.title.includes('国际') ? 1 : 2
     const orderB = b.title.includes('国产') ? 0 : b.title.includes('国际') ? 1 : 2
@@ -124,6 +175,16 @@ const filteredGroups = computed(() => {
 })
 
 function handleSelect(modelId: string) {
+  if (modelId === 'auto') {
+    emit('select', modelId)
+    return
+  }
+  if (!isModelUnlocked(modelId)) {
+    const group = getModelGroup(modelId)
+    postMessage({ type: 'openSettings', tab: 'token', highlightGroup: group })
+    emit('close')
+    return
+  }
   emit('select', modelId)
 }
 
@@ -198,7 +259,11 @@ function getTagClass(tag?: string): string {
               v-for="model in group.models"
               :key="model.id"
               class="model-row"
-              :class="{ selected: model.id === currentModel }"
+              :class="{
+                selected: model.id === currentModel,
+                locked: !isModelUnlocked(model.id),
+              }"
+              :title="isModelUnlocked(model.id) ? '' : `需要配置 ${getModelGroup(model.id)} 令牌`"
               @click="handleSelect(model.id)"
             >
               <span class="model-icon-badge" :class="getIconClass(model.id)">
@@ -207,8 +272,9 @@ function getTagClass(tag?: string): string {
               <div class="model-info">
                 <div class="model-name">
                   {{ model.label }}
+                  <span v-if="!isModelUnlocked(model.id)" class="lock-icon">🔒</span>
                   <span
-                    v-if="model.tag"
+                    v-if="model.tag && isModelUnlocked(model.id)"
                     class="model-tag"
                     :class="getTagClass(model.tag)"
                   >

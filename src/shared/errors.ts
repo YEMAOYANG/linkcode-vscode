@@ -33,7 +33,7 @@ export class ApiError extends LinkCodeError {
  * Thrown when authentication fails (missing or invalid API key).
  */
 export class AuthError extends LinkCodeError {
-  constructor(message: string) {
+  constructor(message: string, public readonly group?: string) {
     super(message, 'AUTH_ERROR')
     this.name = 'AuthError'
   }

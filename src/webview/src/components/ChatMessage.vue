@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { useMarkdown } from '../composables/useMarkdown'
+import { useVSCode } from '../composables/useVSCode'
 
 const props = defineProps<{
   role: 'user' | 'assistant'
@@ -9,10 +10,45 @@ const props = defineProps<{
   cost?: string
   savings?: string
   tokenCount?: number
+  messageId?: string
 }>()
 
 const { renderMarkdown } = useMarkdown()
+const { postMessage } = useVSCode()
 const renderedHtml = ref('')
+
+// Feedback state
+const feedbackRating = ref<'up' | 'down' | null>(null)
+const showFeedbackPanel = ref(false)
+const feedbackSubmitted = ref(false)
+const FEEDBACK_TOAST_MS = 2000
+
+const feedbackCategories = [
+  { id: 'inaccurate', label: '回答不准确' },
+  { id: 'buggy', label: '代码有 Bug' },
+  { id: 'insufficient', label: '不够详细' },
+  { id: 'other', label: '其他' },
+]
+
+function handleThumbUp() {
+  feedbackRating.value = 'up'
+  showFeedbackPanel.value = false
+  postMessage({ type: 'feedback', messageId: props.messageId, rating: 'up', category: '' })
+  feedbackSubmitted.value = true
+  setTimeout(() => { feedbackSubmitted.value = false }, FEEDBACK_TOAST_MS)
+}
+
+function handleThumbDown() {
+  feedbackRating.value = 'down'
+  showFeedbackPanel.value = true
+}
+
+function submitFeedback(category: string) {
+  postMessage({ type: 'feedback', messageId: props.messageId, rating: 'down', category })
+  showFeedbackPanel.value = false
+  feedbackSubmitted.value = true
+  setTimeout(() => { feedbackSubmitted.value = false }, FEEDBACK_TOAST_MS)
+}
 
 async function render() {
   if (props.role === 'assistant') {
@@ -58,6 +94,46 @@ watch(() => props.content, render)
     <div v-if="role === 'assistant' && cost" class="msg-cost">
       <span>💰 {{ cost }}</span>
       <span v-if="savings" class="msg-cost-save">{{ savings }}</span>
+    </div>
+
+    <!-- Feedback buttons for AI messages -->
+    <div v-if="role === 'assistant' && content" class="msg-feedback">
+      <div class="feedback-btns">
+        <button
+          class="feedback-btn"
+          :class="{ active: feedbackRating === 'up' }"
+          title="有帮助"
+          @click="handleThumbUp"
+        >
+          👍
+        </button>
+        <button
+          class="feedback-btn"
+          :class="{ active: feedbackRating === 'down' }"
+          title="无帮助"
+          @click="handleThumbDown"
+        >
+          👎
+        </button>
+      </div>
+
+      <!-- Feedback category panel -->
+      <div v-if="showFeedbackPanel" class="feedback-panel">
+        <div class="feedback-panel-title">请选择原因：</div>
+        <button
+          v-for="cat in feedbackCategories"
+          :key="cat.id"
+          class="feedback-cat-btn"
+          @click="submitFeedback(cat.id)"
+        >
+          {{ cat.label }}
+        </button>
+      </div>
+
+      <!-- Feedback submitted toast -->
+      <div v-if="feedbackSubmitted" class="feedback-toast">
+        感谢反馈 ✓
+      </div>
     </div>
   </div>
 </template>

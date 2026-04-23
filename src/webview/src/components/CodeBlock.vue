@@ -10,12 +10,17 @@ const props = defineProps<{
   language?: string
 }>()
 
+const emit = defineEmits<{
+  quote: [code: string, language: string]
+}>()
+
 const { highlight } = useHighlight()
 const { postMessage } = useVSCode()
 
 const highlightedHtml = ref('')
 const buttonText = ref('Copy')
 const applyText = ref('Apply')
+const quoteText = ref('Quote')
 
 let copyTimer: ReturnType<typeof setTimeout> | undefined
 let applyTimer: ReturnType<typeof setTimeout> | undefined
@@ -57,6 +62,14 @@ function handleApply() {
     applyText.value = 'Apply'
   }, FEEDBACK_RESET_MS)
 }
+
+function handleQuote() {
+  emit('quote', props.code, props.language ?? 'text')
+  quoteText.value = 'Quoted ✓'
+  setTimeout(() => {
+    quoteText.value = 'Quote'
+  }, FEEDBACK_RESET_MS)
+}
 </script>
 
 <template>
@@ -69,6 +82,9 @@ function handleApply() {
         </button>
         <button class="code-block-apply" @click="handleApply">
           {{ applyText }}
+        </button>
+        <button class="code-block-quote" @click="handleQuote">
+          {{ quoteText }}
         </button>
       </div>
     </div>

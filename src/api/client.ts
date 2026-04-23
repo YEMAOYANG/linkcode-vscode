@@ -15,6 +15,7 @@ import {
   DEFAULT_API_ENDPOINT,
   MODEL_TO_GROUP,
 } from '../shared/constants'
+import type { SecretStore } from '../utils/secretStorage'
 
 /**
  * Centralized API client for all LinkCode backend communication.
@@ -22,9 +23,16 @@ import {
  */
 export class ApiClient {
   private readonly getApiKey: () => Promise<string | undefined>
+  private secretStore?: SecretStore
 
-  constructor(getApiKey: () => Promise<string | undefined>) {
+  constructor(getApiKey: () => Promise<string | undefined>, secretStore?: SecretStore) {
     this.getApiKey = getApiKey
+    this.secretStore = secretStore
+  }
+
+  /** Set the SecretStore for group token routing */
+  public setSecretStore(store: SecretStore): void {
+    this.secretStore = store
   }
 
   /** Expose API key for external use (e.g. fetching model list) */
@@ -33,8 +41,36 @@ export class ApiClient {
   }
 
   /**
+   * Resolve the API key for a specific model, using group token routing.
+   * Returns { apiKey, group } or throws AuthError.
+   */
+  public async resolveApiKeyForModel(model: string): Promise<{ apiKey: string; group: string | undefined }> {
+    const group = MODEL_TO_GROUP[model]
+
+    // Try group-specific token from SecretStorage first
+    if (group && this.secretStore) {
+      const groupToken = await this.secretStore.getGroupToken(group)
+      if (groupToken) {
+        return { apiKey: groupToken, group }
+      }
+    }
+
+    // Fallback to general API key
+    const apiKey = await this.getApiKey()
+    if (apiKey) {
+      return { apiKey, group }
+    }
+
+    throw new AuthError(
+      group
+        ? `分组 ${group} 的 API Token 未配置，且无通用 API Key`
+        : 'API Key 未配置',
+      group
+    )
+  }
+
+  /**
    * Fetch a single-shot code completion using Chat Completions API.
-   * Smoothlink has no dedicated FIM endpoint, so we simulate with chat.
    */
   async complete(
     payload: CompletionRequest,
@@ -115,7 +151,6 @@ export class ApiClient {
 
   /**
    * Stream a chat response from the Smoothlink API (SSE).
-   * Uses OpenAI-compatible Chat Completions endpoint.
    */
   async *streamChat(
     messages: ChatMessage[],
@@ -172,28 +207,7 @@ export class ApiClient {
 
   private async getHeaders(model?: string): Promise<Record<string, string>> {
     const targetModel = model ?? this.getModel()
-    const group = MODEL_TO_GROUP[targetModel]
-
-    // Try group-specific token first, then fall back to general API key
-    let apiKey: string | undefined
-    if (group) {
-      const config = vscode.workspace.getConfiguration(CONFIG_SECTION)
-      const tokens = config.get<Record<string, string>>('apiTokens') ?? {}
-      apiKey = tokens[group]
-    }
-
-    if (!apiKey) {
-      apiKey = await this.getApiKey()
-    }
-
-    if (!apiKey) {
-      throw new AuthError(
-        group
-          ? `分组 ${group} 的 API Token 未配置，且无通用 API Key`
-          : 'API Key 未配置'
-      )
-    }
-
+    const { apiKey } = await this.resolveApiKeyForModel(targetModel)
     return {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,

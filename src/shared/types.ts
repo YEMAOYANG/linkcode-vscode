@@ -48,6 +48,37 @@ export type ExtToWebMsg =
   | { type: 'chatCleared' }
   | { type: 'show_onboarding' }
   | { type: 'apiKeyValidated'; success: boolean; message?: string }
+  | { type: 'show_error'; errorType: string; message?: string }
+  | { type: 'clear_error' }
+  | { type: 'show_code_review' }
+  | { type: 'show_inline_edit' }
+  | { type: 'show_login' }
+  | { type: 'recentFiles'; files: Array<{ name: string; path: string }> }
+  | { type: 'code_review_start'; fileName?: string }
+  | { type: 'code_review_chunk'; content: string }
+  | { type: 'code_review_end' }
+  | { type: 'inline_edit_context'; code: string; fileName?: string }
+  | { type: 'inline_edit_start' }
+  | { type: 'inline_edit_chunk'; content: string }
+  | { type: 'inline_edit_end' }
+  | { type: 'tokenMissing'; group: string; model: string }
+  | { type: 'tokenInvalid'; group: string }
+  | { type: 'groupTokenValidated'; group: string; success: boolean; message?: string; models?: string[] }
+  | { type: 'groupTokenStatus'; tokens: Record<string, boolean> }
+  | { type: 'open_settings'; tab?: string; highlightGroup?: string }
+  | { type: 'fileContent'; filepath: string; content: string; name: string }
+  | { type: 'historyList'; sessions: SessionSummary[] }
+
+/**
+ * Session summary for history list.
+ */
+export interface SessionSummary {
+  id: string
+  title: string
+  messageCount: number
+  timestamp: number
+  model?: string
+}
 
 /**
  * Messages sent from the WebView to the Extension Host.
@@ -65,3 +96,19 @@ export type WebToExtMsg =
   | { type: 'validateApiKey'; key: string }
   | { type: 'updateConfig'; key: string; value: unknown }
   | { type: 'onboardingComplete' }
+  | { type: 'feedback'; messageId?: string; rating: string; category: string }
+  | { type: 'getRecentFiles' }
+  | { type: 'attachFile'; name: string; content: string }
+  | { type: 'startCodeReview' }
+  | { type: 'inlineEditRequest'; instruction: string; code: string }
+  | { type: 'inlineEditAccept'; code: string }
+  | { type: 'githubLogin' }
+  | { type: 'setGroupToken'; group: string; token: string }
+  | { type: 'deleteGroupToken'; group: string }
+  | { type: 'validateGroupToken'; group: string; token: string }
+  | { type: 'getGroupTokenStatus' }
+  | { type: 'openSettings'; tab?: string; highlightGroup?: string }
+  | { type: 'openExternal'; url: string }
+  | { type: 'getFileContent'; filepath: string }
+  | { type: 'getSessionHistory' }
+  | { type: 'loadSession'; sessionId: string }
