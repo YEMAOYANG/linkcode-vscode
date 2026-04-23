@@ -27,57 +27,21 @@ function handleKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="chat-input">
+  <div class="flex gap-1.5 p-2 border-t border-border">
     <textarea
       v-model="input"
       :disabled="disabled"
       placeholder="Ask LinkCode anything…"
       rows="2"
+      class="flex-1 resize-none bg-input-bg text-input-fg border border-border rounded-sm px-2 py-1.5 text-[length:inherit] outline-none focus:border-button-bg"
       @keydown="handleKeydown"
     />
-    <button :disabled="disabled || !input.trim()" @click="handleSend">
+    <button
+      :disabled="disabled || !input.trim()"
+      class="bg-button-bg text-button-fg border-none rounded-sm px-3.5 py-1.5 cursor-pointer text-[length:inherit] hover:bg-button-hover disabled:opacity-50 disabled:cursor-not-allowed"
+      @click="handleSend"
+    >
       Send
     </button>
   </div>
 </template>
-
-<style scoped>
-.chat-input {
-  display: flex;
-  gap: 6px;
-  padding: 8px;
-  border-top: 1px solid var(--border);
-}
-
-textarea {
-  flex: 1;
-  resize: none;
-  background: var(--input-bg);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 6px 8px;
-  font-family: inherit;
-  font-size: inherit;
-  outline: none;
-}
-
-textarea:focus {
-  border-color: var(--accent);
-}
-
-button {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 6px 14px;
-  cursor: pointer;
-  font-size: inherit;
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-</style>

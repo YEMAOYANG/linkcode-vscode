@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: var(--vscode-editor-background);
+  --color-fg: var(--vscode-foreground);
+  --color-border: var(--vscode-panel-border);
+  --color-input-bg: var(--vscode-input-background);
+  --color-input-fg: var(--vscode-input-foreground);
+  --color-button-bg: var(--vscode-button-background);
+  --color-button-fg: var(--vscode-button-foreground);
+  --color-button-hover: var(--vscode-button-hoverBackground);
+  --color-link: var(--vscode-textLink-foreground);
+  --color-code-bg: var(--vscode-textCodeBlock-background);
+}

@@ -31,16 +31,24 @@ watch(
 </script>
 
 <template>
-  <div class="chat-container">
-    <div ref="messagesListRef" class="messages-list">
+  <div class="flex flex-col h-screen bg-bg text-fg text-[length:var(--vscode-font-size,_13px)]" style="font-family: var(--vscode-font-family, 'Segoe UI', sans-serif)">
+    <div
+      ref="messagesListRef"
+      class="flex-1 overflow-y-auto p-2"
+    >
       <ChatMessage
         v-for="msg in messages"
         :key="msg.id"
         :role="msg.role"
         :content="msg.content"
       />
-      <div v-if="isLoading" class="loading-indicator">
-        <span class="dot" /><span class="dot" /><span class="dot" />
+      <div
+        v-if="isLoading"
+        class="flex gap-1 px-3 py-2"
+      >
+        <span class="size-1.5 rounded-full bg-fg opacity-40 animate-[blink_1.4s_infinite_both]" />
+        <span class="size-1.5 rounded-full bg-fg opacity-40 animate-[blink_1.4s_infinite_both_0.2s]" />
+        <span class="size-1.5 rounded-full bg-fg opacity-40 animate-[blink_1.4s_infinite_both_0.4s]" />
       </div>
     </div>
     <ChatInput :disabled="isLoading" @send="handleSend" />
@@ -48,56 +56,18 @@ watch(
 </template>
 
 <style>
-:root {
-  --bg: var(--vscode-editor-background, #1e1e1e);
-  --fg: var(--vscode-editor-foreground, #cccccc);
-  --border: var(--vscode-panel-border, #333);
-  --accent: var(--vscode-button-background, #007acc);
-  --input-bg: var(--vscode-input-background, #3c3c3c);
-}
-
-* {
+/* Global reset — keep minimal, Tailwind preflight handles most */
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
 }
 
 body {
-  background: var(--bg);
-  color: var(--fg);
-  font-family: var(--vscode-font-family, 'Segoe UI', sans-serif);
-  font-size: var(--vscode-font-size, 13px);
+  background: var(--color-bg);
+  color: var(--color-fg);
 }
-
-.chat-container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-}
-
-.messages-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.loading-indicator {
-  display: flex;
-  gap: 4px;
-  padding: 8px 12px;
-}
-
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--fg);
-  opacity: 0.4;
-  animation: blink 1.4s infinite both;
-}
-
-.dot:nth-child(2) { animation-delay: 0.2s; }
-.dot:nth-child(3) { animation-delay: 0.4s; }
 
 @keyframes blink {
   0%, 80%, 100% { opacity: 0.4; }
