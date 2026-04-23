@@ -52,7 +52,6 @@ const props = defineProps<{
   loading?: boolean
   filterUnlocked?: boolean
   pricingData?: PricingItemProp[]
-  groupRatio?: Record<string, number>
 }>()
 
 const emit = defineEmits<{
@@ -83,7 +82,6 @@ onUnmounted(() => { cleanup?.() })
 /** Pricing lookup: model_name → { ratio, tags[], isFree } */
 const pricingMap = computed(() => {
   const map: Record<string, { ratio: number; tags: string[]; isFree: boolean }> = {}
-  const gr = props.groupRatio ?? {}
   for (const item of (props.pricingData ?? [])) {
     const isFree = item.quota_type === 1
     const ratio = item.model_ratio / 2
