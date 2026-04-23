@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useHighlight } from '../composables/useHighlight'
 import { useVSCode } from '../composables/useVSCode'
+
+const FEEDBACK_RESET_MS = 2000
 
 const props = defineProps<{
   code: string
@@ -15,6 +17,9 @@ const highlightedHtml = ref('')
 const buttonText = ref('Copy')
 const applyText = ref('Apply')
 
+let copyTimer: ReturnType<typeof setTimeout> | undefined
+let applyTimer: ReturnType<typeof setTimeout> | undefined
+
 async function doHighlight() {
   highlightedHtml.value = await highlight(props.code, props.language ?? '')
 }
@@ -23,26 +28,34 @@ onMounted(doHighlight)
 
 watch(() => [props.code, props.language], doHighlight)
 
+onUnmounted(() => {
+  if (copyTimer !== undefined) clearTimeout(copyTimer)
+  if (applyTimer !== undefined) clearTimeout(applyTimer)
+})
+
 async function handleCopy() {
   try {
     await navigator.clipboard.writeText(props.code)
     buttonText.value = 'Copied!'
-    setTimeout(() => {
+    if (copyTimer !== undefined) clearTimeout(copyTimer)
+    copyTimer = setTimeout(() => {
       buttonText.value = 'Copy'
-    }, 2000)
+    }, FEEDBACK_RESET_MS)
   } catch {
     buttonText.value = 'Failed'
-    setTimeout(() => {
+    if (copyTimer !== undefined) clearTimeout(copyTimer)
+    copyTimer = setTimeout(() => {
       buttonText.value = 'Copy'
-    }, 2000)
+    }, FEEDBACK_RESET_MS)
   }
 }
 function handleApply() {
   postMessage({ type: 'applyEdit', code: props.code })
   applyText.value = 'Applied ✓'
-  setTimeout(() => {
+  if (applyTimer !== undefined) clearTimeout(applyTimer)
+  applyTimer = setTimeout(() => {
     applyText.value = 'Apply'
-  }, 2000)
+  }, FEEDBACK_RESET_MS)
 }
 </script>
 

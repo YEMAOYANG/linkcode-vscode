@@ -733,6 +733,47 @@ body {
 .model-icon-sm.db { background: #F97316; }
 .model-icon-badge.glm,
 .model-icon-sm.glm { background: #E11D48; }
+.model-icon-badge.hy,
+.model-icon-sm.hy { background: #8B5CF6; }
+.model-icon-badge.km,
+.model-icon-sm.km { background: #06B6D4; }
+.model-icon-badge.mm,
+.model-icon-sm.mm { background: #F59E0B; }
+.model-icon-badge.ai,
+.model-icon-sm.ai { background: #6B7280; }
+
+/* ─── Model Selector Skeleton Loading ─── */
+.skeleton-row {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.skeleton-icon {
+  background: var(--lc-elevated) !important;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-text {
+  border-radius: 4px;
+  background: var(--lc-elevated);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-name {
+  width: 140px;
+  height: 14px;
+  margin-bottom: 4px;
+}
+
+.skeleton-detail {
+  width: 200px;
+  height: 11px;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
 
 /* ─── Session History Overlay ─── */
 .history-overlay {

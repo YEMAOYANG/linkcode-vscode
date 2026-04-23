@@ -1,12 +1,13 @@
 import * as vscode from 'vscode'
-import type { ExtToWebMsg, WebToExtMsg, StoredChatMessage } from '../shared/types'
+import type { ExtToWebMsg, WebToExtMsg, StoredChatMessage, ApiModelInfo } from '../shared/types'
 import type { ChatMessage } from '../api/types'
 import type { ApiClient } from '../api/client'
 import { getNonce } from '../utils/crypto'
 import { Logger } from '../utils/logger'
-import { CONFIG_SECTION, DEFAULT_MODEL } from '../shared/constants'
+import { CONFIG_SECTION, DEFAULT_MODEL, DEFAULT_API_ENDPOINT, RECOMMENDED_MODELS } from '../shared/constants'
 
 const HISTORY_KEY = 'linkcode.chatHistory'
+const MODEL_FETCH_TIMEOUT_MS = 10_000
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'linkcode.chatView'
@@ -44,8 +45,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this._handleSendMessage(msg.text)
           break
         case 'ready':
-          // WebView is ready — send current model info
+          // WebView is ready — send current model info and fetch model list
           this._sendModelInfo()
+          this._fetchModels()
           break
         case 'getHistory':
           this._sendHistory()
@@ -92,11 +94,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * Handle a CodeLens/command action by sending it to the webview
    * and triggering the chat flow.
    */
-  public handleUserAction(action: string, payload: string): void {
+  public handleUserAction(action: 'explain' | 'refactor' | 'review', payload: string): void {
     // Notify webview to display the user action
     this.postMessage({
       type: 'user_action',
-      action: action as 'explain' | 'refactor' | 'review',
+      action,
       payload,
     })
     // Actually trigger the chat API call
@@ -117,7 +119,122 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /** Handle model change from webview */
   private _handleChangeModel(modelId: string): void {
     const config = vscode.workspace.getConfiguration(CONFIG_SECTION)
-    config.update('model', modelId, vscode.ConfigurationTarget.Global)
+    void Promise.resolve(config.update('model', modelId, vscode.ConfigurationTarget.Global))
+  }
+
+  /**
+   * Fetch available models from the Smoothlink API and push to WebView.
+   * Falls back to RECOMMENDED_MODELS on failure.
+   */
+  private async _fetchModels(): Promise<void> {
+    const logger = Logger.getInstance()
+    const config = vscode.workspace.getConfiguration(CONFIG_SECTION)
+    const endpoint = config.get<string>('apiEndpoint') ?? DEFAULT_API_ENDPOINT
+
+    try {
+      // Try to get API key — group-specific tokens or general key
+      let apiKey: string | undefined
+      const tokens = config.get<Record<string, string>>('apiTokens') ?? {}
+      // Use any available token for the models list request
+      const tokenValues = Object.values(tokens)
+      if (tokenValues.length > 0) {
+        apiKey = tokenValues[0]
+      }
+      if (!apiKey) {
+        // Fall back to the general API key from SecretStorage via apiClient
+        // We'll just use the apiClient's getApiKey
+        apiKey = await this._getApiKeyForModels()
+      }
+
+      if (!apiKey) {
+        logger.warn('[fetchModels] No API key available, using fallback models')
+        this._sendFallbackModels()
+        return
+      }
+
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), MODEL_FETCH_TIMEOUT_MS)
+
+      try {
+        const res = await fetch(`${endpoint}/v1/models`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        })
+
+        if (!res.ok) {
+          logger.warn(`[fetchModels] API returned ${res.status}, using fallback`)
+          this._sendFallbackModels()
+          return
+        }
+
+        const data = (await res.json()) as {
+          data?: Array<{ id: string; object?: string }>
+        }
+
+        if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
+          logger.warn('[fetchModels] Empty response, using fallback')
+          this._sendFallbackModels()
+          return
+        }
+
+        const models: ApiModelInfo[] = data.data.map((m) => ({
+          id: m.id,
+          label: m.id,
+          provider: ChatViewProvider._inferProvider(m.id),
+        }))
+
+        logger.info(`[fetchModels] Got ${models.length} models from API`)
+        this.postMessage({ type: 'modelList', models })
+      } finally {
+        clearTimeout(timeout)
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        logger.warn('[fetchModels] Request timed out, using fallback')
+      } else {
+        logger.error('[fetchModels] Failed to fetch models', err)
+      }
+      this._sendFallbackModels()
+    }
+  }
+
+  /** Send fallback model list from constants */
+  private _sendFallbackModels(): void {
+    const models: ApiModelInfo[] = RECOMMENDED_MODELS.map((m) => ({
+      id: m.id,
+      label: m.label,
+      provider: m.provider,
+      tag: m.tag || undefined,
+    }))
+    this.postMessage({ type: 'modelList', models })
+  }
+
+  /** Try to retrieve an API key for the models endpoint */
+  private async _getApiKeyForModels(): Promise<string | undefined> {
+    try {
+      return await this.apiClient.resolveApiKey()
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Infer provider name from model ID */
+  private static _inferProvider(id: string): string {
+    if (id.startsWith('claude')) return 'Anthropic'
+    if (id.startsWith('gpt') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4')) return 'OpenAI'
+    if (id.startsWith('gemini')) return 'Google'
+    if (id.startsWith('deepseek')) return 'DeepSeek'
+    if (id.startsWith('qwen')) return 'Qwen'
+    if (id.startsWith('glm') || id.startsWith('chatglm')) return 'GLM'
+    if (id.startsWith('hunyuan')) return 'HunYuan'
+    if (id.startsWith('kimi') || id.startsWith('moonshot')) return 'Kimi'
+    if (id.startsWith('minimax')) return 'MiniMax'
+    if (id.startsWith('doubao')) return 'Doubao'
+    return 'Other'
   }
 
   /** Handle new chat request from webview */
@@ -140,21 +257,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       : selection
     const edit = new vscode.WorkspaceEdit()
     edit.replace(editor.document.uri, range, code)
-    vscode.workspace.applyEdit(edit)
+    void Promise.resolve(vscode.workspace.applyEdit(edit))
   }
 
-  /** Load persisted messages and send to webview */
+  /** Load persisted messages and send to webview, also restore extension-side chat history */
   private _sendHistory(): void {
     const stored = this.globalState.get<StoredChatMessage[]>(HISTORY_KEY, [])
     this._view?.webview.postMessage({
       type: 'loadHistory',
       messages: stored,
     })
+
+    // Restore extension-side chat history so API calls have full context
+    this._chatHistory = stored.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }))
   }
 
   /** Save messages from webview to globalState */
   private _saveHistory(messages: StoredChatMessage[]): void {
-    this.globalState.update(HISTORY_KEY, messages)
+    void Promise.resolve(this.globalState.update(HISTORY_KEY, messages))
   }
 
   private async _handleSendMessage(text: string): Promise<void> {
@@ -196,6 +319,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.postMessage({ type: 'stream_end' })
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
+        this.postMessage({ type: 'stream_end' })
         return
       }
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'

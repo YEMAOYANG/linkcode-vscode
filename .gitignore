@@ -5,3 +5,5 @@ src/webview/node_modules/
 webview/dist/
 *.vsix
 .DS_Store
+pnpm-lock.yaml
+src/webview/pnpm-lock.yaml

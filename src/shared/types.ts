@@ -24,6 +24,16 @@ export interface StoredChatMessage {
 /**
  * Messages sent from the Extension Host to the WebView.
  */
+/**
+ * Model info returned from the /v1/models API.
+ */
+export interface ApiModelInfo {
+  id: string
+  label: string
+  provider: string
+  tag?: string
+}
+
 export type ExtToWebMsg =
   | { type: 'stream_start' }
   | { type: 'stream_chunk'; content: string }
@@ -34,6 +44,7 @@ export type ExtToWebMsg =
   | { type: 'user_action'; action: 'explain' | 'refactor' | 'review'; payload: string }
   | { type: 'loadHistory'; messages: StoredChatMessage[] }
   | { type: 'modelInfo'; modelId: string }
+  | { type: 'modelList'; models: ApiModelInfo[] }
   | { type: 'chatCleared' }
 
 /**

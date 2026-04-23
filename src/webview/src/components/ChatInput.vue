@@ -33,11 +33,13 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
+const MAX_TEXTAREA_HEIGHT = 120
+
 function handleInput() {
   const el = textareaRef.value
   if (el) {
     el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+    el.style.height = Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT) + 'px'
   }
 }
 

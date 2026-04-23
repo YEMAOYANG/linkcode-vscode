@@ -6,9 +6,11 @@ import ModelSelector from './components/ModelSelector.vue'
 import SessionHistory from './components/SessionHistory.vue'
 import { useChat } from './composables/useChat'
 import { useVSCode } from './composables/useVSCode'
+import { usePlatform } from './composables/usePlatform'
 
-const { messages, sendMessage, isLoading, currentModel, changeModel, clearMessages } = useChat()
+const { messages, sendMessage, isLoading, currentModel, models, modelsLoading, changeModel, clearMessages } = useChat()
 const { postMessage } = useVSCode()
+const { modKey } = usePlatform()
 
 const messagesListRef = ref<HTMLElement | null>(null)
 const showModelSelector = ref(false)
@@ -141,7 +143,7 @@ function handleOpenSettings() {
         <div class="tips-area">
           <h4>💡 快捷提示</h4>
           <ul>
-            <li>选中代码按 ⌘I 直接引用</li>
+            <li>选中代码按 {{ modKey }}I 直接引用</li>
             <li>输入 @ 引用文件和项目上下文</li>
             <li>拖拽文件到输入框快速引用</li>
           </ul>
@@ -187,6 +189,8 @@ function handleOpenSettings() {
     <ModelSelector
       v-if="showModelSelector"
       :current-model="currentModel"
+      :models="models"
+      :loading="modelsLoading"
       @select="handleModelChange"
       @close="showModelSelector = false"
     />

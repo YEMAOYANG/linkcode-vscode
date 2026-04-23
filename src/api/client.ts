@@ -27,6 +27,11 @@ export class ApiClient {
     this.getApiKey = getApiKey
   }
 
+  /** Expose API key for external use (e.g. fetching model list) */
+  public async resolveApiKey(): Promise<string | undefined> {
+    return this.getApiKey()
+  }
+
   /**
    * Fetch a single-shot code completion using Chat Completions API.
    * Smoothlink has no dedicated FIM endpoint, so we simulate with chat.
@@ -149,7 +154,6 @@ export class ApiClient {
       })
 
       if (!res.ok) {
-        const logger = Logger.getInstance()
         const errorBody = await res.text().catch(() => 'unknown')
         logger.error(
           `Chat API request failed: ${res.status} ${res.statusText} — ${errorBody}`

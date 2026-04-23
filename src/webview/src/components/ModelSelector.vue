@@ -1,8 +1,23 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 
+interface ModelInfo {
+  id: string
+  label: string
+  provider: string
+  tag?: string
+}
+
+interface ModelGroup {
+  title: string
+  emoji: string
+  models: ModelInfo[]
+}
+
 const props = defineProps<{
   currentModel: string
+  models: ModelInfo[]
+  loading?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -11,61 +26,98 @@ const emit = defineEmits<{
 }>()
 
 const searchQuery = ref('')
-
-interface ModelItem {
-  id: string
-  name: string
-  tag?: string
-  tagColor?: string
-  price: string
-  iconClass: string
-  iconLabel: string
-}
-
-interface ModelGroup {
-  title: string
-  emoji: string
-  models: ModelItem[]
-}
-
 const maxMode = ref(false)
 
-const modelGroups: ModelGroup[] = [
-  {
-    title: '国产模型（低成本）',
-    emoji: '🇨🇳',
-    models: [
-      { id: 'deepseek-v3', name: 'DeepSeek-V3', tag: '性价比之王', tagColor: 'green', price: '¥0.001/1K tokens · 128K', iconClass: 'ds', iconLabel: 'DS' },
-      { id: 'deepseek-r1', name: 'DeepSeek-R1', tag: '强推理', tagColor: 'blue', price: '¥0.002/1K tokens · 64K', iconClass: 'ds', iconLabel: 'DS' },
-      { id: 'qwen2.5-coder-32b', name: 'Qwen2.5-Coder-32B', tag: '代码专家', tagColor: 'blue', price: '¥0.002/1K tokens · 128K', iconClass: 'qw', iconLabel: 'QW' },
-      { id: 'doubao-pro', name: 'Doubao-Pro', price: '¥0.001/1K tokens · 32K', iconClass: 'db', iconLabel: 'DB' },
-      { id: 'glm-4', name: 'GLM-4', price: '¥0.001/1K tokens · 128K', iconClass: 'glm', iconLabel: 'GL' },
-    ],
-  },
-  {
-    title: '国际模型（高质量）',
-    emoji: '🌍',
-    models: [
-      { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', tag: '推理最强', tagColor: 'purple', price: '¥0.015/1K tokens · 200K', iconClass: 'cl', iconLabel: 'CL' },
-      { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', tag: '最高质量', tagColor: 'yellow', price: '¥0.075/1K tokens · 200K', iconClass: 'cl', iconLabel: 'CL' },
-      { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', tag: '最快', tagColor: 'blue', price: '¥0.001/1K tokens · 200K', iconClass: 'cl', iconLabel: 'CL' },
-      { id: 'gpt-5', name: 'GPT-5', price: '¥0.010/1K tokens · 128K', iconClass: 'gpt', iconLabel: 'GP' },
-      { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', tag: '长上下文', tagColor: 'blue', price: '¥0.005/1K tokens · 200K', iconClass: 'ge', iconLabel: 'GE' },
-      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', tag: '快速', tagColor: 'green', price: '¥0.001/1K tokens · 100K', iconClass: 'ge', iconLabel: 'GE' },
-    ],
-  },
-]
+/** Provider → display group config */
+const PROVIDER_GROUPS: Record<string, { title: string; emoji: string; order: number }> = {
+  DeepSeek: { title: '国产模型（低成本）', emoji: '🇨🇳', order: 0 },
+  Qwen:     { title: '国产模型（低成本）', emoji: '🇨🇳', order: 0 },
+  GLM:      { title: '国产模型（低成本）', emoji: '🇨🇳', order: 0 },
+  HunYuan:  { title: '国产模型（低成本）', emoji: '🇨🇳', order: 0 },
+  Kimi:     { title: '国产模型（低成本）', emoji: '🇨🇳', order: 0 },
+  MiniMax:  { title: '国产模型（低成本）', emoji: '🇨🇳', order: 0 },
+  Doubao:   { title: '国产模型（低成本）', emoji: '🇨🇳', order: 0 },
+  Anthropic:{ title: '国际模型（高质量）', emoji: '🌍', order: 1 },
+  OpenAI:   { title: '国际模型（高质量）', emoji: '🌍', order: 1 },
+  Google:   { title: '国际模型（高质量）', emoji: '🌍', order: 1 },
+}
+
+/** Get icon class from model id */
+function getIconClass(id: string): string {
+  if (id.startsWith('claude')) return 'cl'
+  if (id.startsWith('deepseek')) return 'ds'
+  if (id.startsWith('qwen')) return 'qw'
+  if (id.startsWith('glm') || id.startsWith('chatglm')) return 'glm'
+  if (id.startsWith('gpt') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4')) return 'gpt'
+  if (id.startsWith('gemini')) return 'ge'
+  if (id.startsWith('doubao')) return 'db'
+  if (id.startsWith('hunyuan')) return 'hy'
+  if (id.startsWith('kimi') || id.startsWith('moonshot')) return 'km'
+  if (id.startsWith('minimax')) return 'mm'
+  return 'ai'
+}
+
+/** Get 2-letter icon label from model id */
+function getIconLabel(id: string): string {
+  if (id.startsWith('claude')) return 'CL'
+  if (id.startsWith('deepseek')) return 'DS'
+  if (id.startsWith('qwen')) return 'QW'
+  if (id.startsWith('glm') || id.startsWith('chatglm')) return 'GL'
+  if (id.startsWith('gpt') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4')) return 'GP'
+  if (id.startsWith('gemini')) return 'GE'
+  if (id.startsWith('doubao')) return 'DB'
+  if (id.startsWith('hunyuan')) return 'HY'
+  if (id.startsWith('kimi') || id.startsWith('moonshot')) return 'KM'
+  if (id.startsWith('minimax')) return 'MM'
+  return 'AI'
+}
+
+/** Build grouped model list from flat models array */
+const modelGroups = computed<ModelGroup[]>(() => {
+  const groupMap = new Map<string, ModelInfo[]>()
+
+  for (const model of props.models) {
+    const groupConfig = PROVIDER_GROUPS[model.provider]
+    const groupKey = groupConfig?.title ?? '其他模型'
+    if (!groupMap.has(groupKey)) {
+      groupMap.set(groupKey, [])
+    }
+    groupMap.get(groupKey)!.push(model)
+  }
+
+  const groups: ModelGroup[] = []
+  for (const [title, models] of groupMap) {
+    // Find emoji from any matching provider
+    const firstModel = models[0]
+    const config = firstModel ? PROVIDER_GROUPS[firstModel.provider] : undefined
+    groups.push({
+      title,
+      emoji: config?.emoji ?? '🤖',
+      models,
+    })
+  }
+
+  // Sort: 国产 first, 国际 second, others last
+  groups.sort((a, b) => {
+    const orderA = a.title.includes('国产') ? 0 : a.title.includes('国际') ? 1 : 2
+    const orderB = b.title.includes('国产') ? 0 : b.title.includes('国际') ? 1 : 2
+    return orderA - orderB
+  })
+
+  return groups
+})
 
 const filteredGroups = computed(() => {
   const q = searchQuery.value.toLowerCase()
-  if (!q) return modelGroups
-  return modelGroups
+  if (!q) return modelGroups.value
+  return modelGroups.value
     .map((g) => ({
       ...g,
       models: g.models.filter(
         (m) =>
-          m.name.toLowerCase().includes(q) ||
-          m.id.toLowerCase().includes(q)
+          m.label.toLowerCase().includes(q) ||
+          m.id.toLowerCase().includes(q) ||
+          m.provider.toLowerCase().includes(q)
       ),
     }))
     .filter((g) => g.models.length > 0)
@@ -75,9 +127,14 @@ function handleSelect(modelId: string) {
   emit('select', modelId)
 }
 
-function getTagClass(color?: string): string {
-  if (!color) return 'tag-default'
-  return `tag-${color}`
+function getTagClass(tag?: string): string {
+  if (!tag) return ''
+  if (tag.includes('推荐') || tag.includes('性价比')) return 'tag-green'
+  if (tag.includes('最强') || tag.includes('最高')) return 'tag-purple'
+  if (tag.includes('最快') || tag.includes('快速')) return 'tag-blue'
+  if (tag.includes('推理')) return 'tag-blue'
+  if (tag.includes('长上下文') || tag.includes('代码')) return 'tag-blue'
+  return 'tag-default'
 }
 </script>
 
@@ -117,50 +174,66 @@ function getTagClass(color?: string): string {
             <div class="model-price">基于任务自动选择最优模型，节省 40% 成本</div>
           </div>
         </button>
-        <div
-          v-for="group in filteredGroups"
-          :key="group.title"
-        >
-          <div class="group-title">{{ group.emoji }} {{ group.title }}</div>
-          <button
-            v-for="model in group.models"
-            :key="model.id"
-            class="model-row"
-            :class="{ selected: model.id === currentModel }"
-            @click="handleSelect(model.id)"
-          >
-            <span class="model-icon-badge" :class="model.iconClass">
-              {{ model.iconLabel }}
-            </span>
+
+        <!-- Loading skeleton -->
+        <template v-if="loading && models.length === 0">
+          <div class="group-title">⏳ 加载模型列表中...</div>
+          <div v-for="i in 4" :key="i" class="model-row skeleton-row">
+            <span class="model-icon-badge skeleton-icon" />
             <div class="model-info">
-              <div class="model-name">
-                {{ model.name }}
-                <span
-                  v-if="model.tag"
-                  class="model-tag"
-                  :class="getTagClass(model.tagColor)"
-                >
-                  {{ model.tag }}
-                </span>
-              </div>
-              <div class="model-price">{{ model.price }}</div>
+              <div class="skeleton-text skeleton-name" />
+              <div class="skeleton-text skeleton-detail" />
             </div>
-            <svg
-              v-if="model.id === currentModel"
-              class="check-icon"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+          </div>
+        </template>
+
+        <!-- Model groups -->
+        <template v-else>
+          <div
+            v-for="group in filteredGroups"
+            :key="group.title"
+          >
+            <div class="group-title">{{ group.emoji }} {{ group.title }}</div>
+            <button
+              v-for="model in group.models"
+              :key="model.id"
+              class="model-row"
+              :class="{ selected: model.id === currentModel }"
+              @click="handleSelect(model.id)"
             >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </button>
-        </div>
+              <span class="model-icon-badge" :class="getIconClass(model.id)">
+                {{ getIconLabel(model.id) }}
+              </span>
+              <div class="model-info">
+                <div class="model-name">
+                  {{ model.label }}
+                  <span
+                    v-if="model.tag"
+                    class="model-tag"
+                    :class="getTagClass(model.tag)"
+                  >
+                    {{ model.tag }}
+                  </span>
+                </div>
+                <div class="model-price">{{ model.provider }} · {{ model.id }}</div>
+              </div>
+              <svg
+                v-if="model.id === currentModel"
+                class="check-icon"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </button>
+          </div>
+        </template>
       </div>
 
       <!-- Footer with Max Mode -->

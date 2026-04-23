@@ -10,6 +10,25 @@ export interface ChatMsg {
   tokenCount?: number
 }
 
+export interface ModelInfo {
+  id: string
+  label: string
+  provider: string
+  tag?: string
+}
+
+/** Fallback model list matching RECOMMENDED_MODELS in constants */
+const FALLBACK_MODELS: ModelInfo[] = [
+  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'Anthropic', tag: '推荐' },
+  { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'Anthropic', tag: '最强推理' },
+  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', provider: 'Anthropic', tag: '最快' },
+  { id: 'deepseek-r1', label: 'DeepSeek R1', provider: 'DeepSeek', tag: '强推理' },
+  { id: 'deepseek-v3', label: 'DeepSeek V3', provider: 'DeepSeek', tag: '性价比' },
+  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', provider: 'Google', tag: '长上下文' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Google', tag: '快速' },
+  { id: 'gpt-5', label: 'GPT-5', provider: 'OpenAI' },
+]
+
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
@@ -18,6 +37,8 @@ export function useChat() {
   const messages = ref<ChatMsg[]>([])
   const isLoading = ref(false)
   const currentModel = ref('claude-sonnet-4-6')
+  const models = ref<ModelInfo[]>(FALLBACK_MODELS)
+  const modelsLoading = ref(true)
   const { onMessage, postMessage } = useVSCode()
 
   let cleanup: (() => void) | undefined
@@ -39,6 +60,7 @@ export function useChat() {
         code?: string
         language?: string
         messages?: ChatMsg[]
+        models?: ModelInfo[]
         modelId?: string
         cost?: string
         savings?: string
@@ -56,6 +78,13 @@ export function useChat() {
         case 'modelInfo':
           if (msg.modelId) {
             currentModel.value = msg.modelId
+          }
+          break
+
+        case 'modelList':
+          if (msg.models && Array.isArray(msg.models)) {
+            models.value = msg.models
+            modelsLoading.value = false
           }
           break
 
@@ -148,6 +177,8 @@ export function useChat() {
     messages,
     isLoading,
     currentModel,
+    models,
+    modelsLoading,
     sendMessage,
     clearMessages,
     changeModel,
