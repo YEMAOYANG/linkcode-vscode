@@ -59,8 +59,8 @@
       "properties": {
         "linkcode.apiEndpoint": {
           "type": "string",
-          "default": "https://api.linkcode.ai",
-          "description": "LinkCode API endpoint"
+          "default": "https://smoothlink.ai",
+          "description": "Smoothlink API 地址"
         },
         "linkcode.enableInlineCompletion": {
           "type": "boolean",
@@ -71,6 +71,36 @@
           "type": "number",
           "default": 300,
           "description": "Debounce delay for inline completion requests (ms)"
+        },
+        "linkcode.model": {
+          "type": "string",
+          "default": "claude-sonnet-4-6",
+          "enum": [
+            "claude-sonnet-4-6",
+            "claude-opus-4-6",
+            "claude-haiku-4-5-20251001",
+            "deepseek-r1",
+            "deepseek-v3",
+            "gemini-2.5-pro",
+            "gemini-2.5-flash",
+            "gpt-5"
+          ],
+          "enumDescriptions": [
+            "Claude Sonnet 4.6 (推荐，平衡速度与质量)",
+            "Claude Opus 4.6 (最强推理，适合复杂问题)",
+            "Claude Haiku 4.5 (最快，适合 Inline 补全)",
+            "DeepSeek R1 (强推理，性价比高)",
+            "DeepSeek V3 (通用，性价比高)",
+            "Gemini 2.5 Pro (长上下文，200k tokens)",
+            "Gemini 2.5 Flash (快速，适合补全)",
+            "GPT-5"
+          ],
+          "description": "LinkCode Chat 使用的 AI 模型"
+        },
+        "linkcode.completionModel": {
+          "type": "string",
+          "default": "claude-haiku-4-5-20251001",
+          "description": "Inline 代码补全专用模型（建议选速度快的小模型）"
         }
       }
     },

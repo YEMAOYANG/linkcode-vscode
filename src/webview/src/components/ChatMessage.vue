@@ -5,6 +5,7 @@ import { useMarkdown } from '../composables/useMarkdown'
 const props = defineProps<{
   role: 'user' | 'assistant'
   content: string
+  model?: string
 }>()
 
 const { renderMarkdown } = useMarkdown()
@@ -21,28 +22,28 @@ watch(() => props.content, render)
 </script>
 
 <template>
-  <div
-    class="chat-message"
-    :class="role === 'user' ? 'chat-message--user' : 'chat-message--assistant'"
-  >
-    <div class="chat-avatar">
-      {{ role === 'user' ? '👤' : '🤖' }}
-    </div>
-    <div class="chat-bubble" :class="role === 'user' ? 'bubble--user' : 'bubble--assistant'">
-      <div class="chat-role-label">
-        {{ role === 'user' ? 'You' : 'LinkCode' }}
+  <div class="message" :class="{ 'message--streaming': role === 'assistant' && !content }">
+    <div class="msg-header">
+      <div class="msg-avatar" :class="role === 'user' ? 'user' : 'ai'">
+        {{ role === 'user' ? 'U' : '✦' }}
       </div>
-      <div class="chat-body">
-        <!-- Assistant: full markdown rendered -->
-        <div
-          v-if="role === 'assistant'"
-          class="markdown-body"
-          v-html="renderedHtml"
-        />
-        <!-- User: plain text with whitespace preserved -->
-        <div v-else class="whitespace-pre-wrap break-words">
-          {{ content }}
-        </div>
+      <span class="msg-name" :class="{ 'ai-name': role === 'assistant' }">
+        {{ role === 'user' ? '你' : 'LinkCode' }}
+      </span>
+      <span v-if="role === 'assistant' && model" class="msg-meta">
+        <span class="model-badge">{{ model }}</span>
+      </span>
+    </div>
+    <div class="msg-body">
+      <!-- Assistant: full markdown rendered -->
+      <div
+        v-if="role === 'assistant'"
+        class="markdown-body"
+        v-html="renderedHtml"
+      />
+      <!-- User: plain text with whitespace preserved -->
+      <div v-else class="user-text">
+        {{ content }}
       </div>
     </div>
   </div>

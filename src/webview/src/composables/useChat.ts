@@ -14,6 +14,7 @@ function generateId(): string {
 export function useChat() {
   const messages = ref<ChatMsg[]>([])
   const isLoading = ref(false)
+  const currentModel = ref('claude-sonnet-4-6')
   const { onMessage, postMessage } = useVSCode()
 
   let cleanup: (() => void) | undefined
@@ -22,6 +23,8 @@ export function useChat() {
   onMounted(() => {
     // Request chat history from extension host on startup
     postMessage({ type: 'getHistory' })
+    // Signal ready — extension will send model info
+    postMessage({ type: 'ready' })
 
     cleanup = onMessage((event: MessageEvent) => {
       const msg = event.data as {
@@ -33,6 +36,7 @@ export function useChat() {
         code?: string
         language?: string
         messages?: ChatMsg[]
+        modelId?: string
       }
 
       switch (msg.type) {
@@ -42,6 +46,16 @@ export function useChat() {
             messages.value = msg.messages
             historyLoaded = true
           }
+          break
+
+        case 'modelInfo':
+          if (msg.modelId) {
+            currentModel.value = msg.modelId
+          }
+          break
+
+        case 'chatCleared':
+          messages.value = []
           break
 
         case 'stream_start':
@@ -113,10 +127,16 @@ export function useChat() {
     messages.value = []
   }
 
+  function changeModel(modelId: string) {
+    currentModel.value = modelId
+  }
+
   return {
     messages,
     isLoading,
+    currentModel,
     sendMessage,
     clearMessages,
+    changeModel,
   }
 }

@@ -33,6 +33,8 @@ export type ExtToWebMsg =
   | { type: 'code_review'; code: string }
   | { type: 'user_action'; action: 'explain' | 'refactor' | 'review'; payload: string }
   | { type: 'loadHistory'; messages: StoredChatMessage[] }
+  | { type: 'modelInfo'; modelId: string }
+  | { type: 'chatCleared' }
 
 /**
  * Messages sent from the WebView to the Extension Host.
@@ -44,3 +46,5 @@ export type WebToExtMsg =
   | { type: 'ready' }
   | { type: 'getHistory' }
   | { type: 'saveMessages'; messages: StoredChatMessage[] }
+  | { type: 'changeModel'; modelId: string }
+  | { type: 'newChat' }

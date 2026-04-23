@@ -4,6 +4,7 @@ import type { ChatMessage } from '../api/types'
 import type { ApiClient } from '../api/client'
 import { getNonce } from '../utils/crypto'
 import { Logger } from '../utils/logger'
+import { CONFIG_SECTION, DEFAULT_MODEL } from '../shared/constants'
 
 const HISTORY_KEY = 'linkcode.chatHistory'
 
@@ -43,7 +44,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this._handleSendMessage(msg.text)
           break
         case 'ready':
-          // WebView is ready
+          // WebView is ready — send current model info
+          this._sendModelInfo()
           break
         case 'getHistory':
           this._sendHistory()
@@ -51,12 +53,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case 'saveMessages':
           this._saveHistory(msg.messages)
           break
+        case 'changeModel':
+          this._handleChangeModel((msg as { type: 'changeModel'; modelId: string }).modelId)
+          break
+        case 'newChat':
+          this._handleNewChat()
+          break
+      }
+    })
+
+    // Listen for config changes and notify webview
+    const configDisposable = vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration(`${CONFIG_SECTION}.model`)) {
+        this._sendModelInfo()
       }
     })
 
     // Clean up listener when the view is disposed
     webviewView.onDidDispose(() => {
       messageDisposable.dispose()
+      configDisposable.dispose()
       this._abortController?.abort()
       this._view = undefined
     })
@@ -67,6 +83,29 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    */
   public postMessage(message: ExtToWebMsg): void {
     this._view?.webview.postMessage(message)
+  }
+
+  /** Send current model info to webview */
+  private _sendModelInfo(): void {
+    const config = vscode.workspace.getConfiguration(CONFIG_SECTION)
+    const model = config.get<string>('model') ?? DEFAULT_MODEL
+    this._view?.webview.postMessage({
+      type: 'modelInfo',
+      modelId: model,
+    })
+  }
+
+  /** Handle model change from webview */
+  private _handleChangeModel(modelId: string): void {
+    const config = vscode.workspace.getConfiguration(CONFIG_SECTION)
+    config.update('model', modelId, vscode.ConfigurationTarget.Global)
+  }
+
+  /** Handle new chat request from webview */
+  private _handleNewChat(): void {
+    this._chatHistory = []
+    this._abortController?.abort()
+    this.postMessage({ type: 'chatCleared' })
   }
 
   /** Load persisted messages and send to webview */
@@ -144,7 +183,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; img-src ${webview.cspSource} data:;">
+    content="default-src 'none'; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; img-src ${webview.cspSource} data:; connect-src https://smoothlink.ai;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="${styleUri}">
   <title>LinkCode Chat</title>

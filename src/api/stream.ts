@@ -1,7 +1,30 @@
 import type { ChatStreamChunk } from './types'
 
 /**
- * Parse an SSE (Server-Sent Events) stream and yield chunks.
+ * Shape of a single SSE chunk from OpenAI-compatible Chat Completions API.
+ */
+interface OpenAIStreamChunk {
+  id?: string
+  object?: string
+  choices: Array<{
+    index: number
+    delta: {
+      role?: string
+      content?: string | null
+      reasoning_content?: string | null
+    }
+    finish_reason: string | null
+  }>
+  usage?: {
+    prompt_tokens: number
+    completion_tokens: number
+    total_tokens: number
+  }
+}
+
+/**
+ * Parse an SSE (Server-Sent Events) stream from an OpenAI-compatible API
+ * and yield ChatStreamChunk events.
  */
 export async function* parseSSEStream(
   response: Response,
@@ -46,13 +69,25 @@ export async function* parseSSEStream(
           }
 
           try {
-            const parsed = JSON.parse(data) as { content?: string; error?: string }
-            if (parsed.error) {
-              yield { type: 'error', error: parsed.error }
+            const chunk = JSON.parse(data) as OpenAIStreamChunk
+
+            // Check for error in response
+            if ('error' in chunk) {
+              const errObj = chunk as unknown as { error: { message?: string } }
+              yield { type: 'error', error: errObj.error?.message ?? 'Unknown API error' }
               return
             }
-            if (parsed.content) {
-              yield { type: 'token', content: parsed.content }
+
+            const delta = chunk.choices?.[0]?.delta
+            const finishReason = chunk.choices?.[0]?.finish_reason
+
+            if (delta?.content) {
+              yield { type: 'token', content: delta.content }
+            }
+
+            if (finishReason === 'stop' || finishReason === 'length') {
+              yield { type: 'done' }
+              return
             }
           } catch {
             // Non-JSON data line — skip
