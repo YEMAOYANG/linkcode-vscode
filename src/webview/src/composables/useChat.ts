@@ -25,6 +25,15 @@ export interface ModelInfo {
   tag?: string
 }
 
+export interface PricingItemWeb {
+  model_name: string
+  model_ratio: number
+  enable_groups: string[]
+  tags?: string
+  description?: string
+  quota_type?: number
+}
+
 /** Fallback model list matching RECOMMENDED_MODELS in constants */
 const FALLBACK_MODELS: ModelInfo[] = [
   { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'Anthropic', tag: '推荐' },
@@ -54,6 +63,8 @@ export function useChat() {
     messageCount: 0,
     estimatedCost: 0,
   })
+  const pricingData = ref<PricingItemWeb[]>([])
+  const pricingGroupRatio = ref<Record<string, number>>({})
   const { onMessage, postMessage } = useVSCode()
 
   let cleanup: (() => void) | undefined
@@ -75,10 +86,11 @@ export function useChat() {
         code?: string
         language?: string
         messages?: ChatMsg[]
-        models?: ModelInfo[]
+        models?: ModelInfo[] | PricingItemWeb[]
         modelId?: string
         cost?: string
         savings?: string
+        groupRatio?: Record<string, number>
         usage?: {
           prompt_tokens?: number
           completion_tokens?: number
@@ -103,8 +115,17 @@ export function useChat() {
 
         case 'modelList':
           if (msg.models && Array.isArray(msg.models)) {
-            models.value = msg.models
+            models.value = msg.models as ModelInfo[]
             modelsLoading.value = false
+          }
+          break
+
+        case 'pricingData':
+          if (msg.models && Array.isArray(msg.models)) {
+            pricingData.value = msg.models as PricingItemWeb[]
+          }
+          if (msg.groupRatio) {
+            pricingGroupRatio.value = msg.groupRatio
           }
           break
 
@@ -212,6 +233,8 @@ export function useChat() {
     models,
     modelsLoading,
     sessionStats,
+    pricingData,
+    pricingGroupRatio,
     sendMessage,
     clearMessages,
     changeModel,

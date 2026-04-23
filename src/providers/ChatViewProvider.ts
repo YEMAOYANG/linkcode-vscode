@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import type { ExtToWebMsg, WebToExtMsg, StoredChatMessage, ApiModelInfo, SessionSummary } from '../shared/types'
+import type { ExtToWebMsg, WebToExtMsg, StoredChatMessage, ApiModelInfo, SessionSummary, PricingResponse } from '../shared/types'
 import type { ChatMessage } from '../api/types'
 import type { ApiClient } from '../api/client'
 import type { SecretStore } from '../utils/secretStorage'
@@ -56,6 +56,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case 'ready':
           this._sendModelInfo()
           this._fetchModels()
+          this._fetchPricing()
           this._checkOnboarding()
           break
         case 'getHistory':
@@ -280,6 +281,32 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.postMessage({ type: 'modelList', models })
   }
 
+  /** Fetch pricing data from Smoothlink public API and forward to WebView */
+  private async _fetchPricing(): Promise<void> {
+    const logger = Logger.getInstance()
+    try {
+      const res = await fetch('https://smoothlink.ai/api/pricing', {
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (!res.ok) {
+        logger.warn(`[fetchPricing] API returned ${res.status}`)
+        return
+      }
+      const json = (await res.json()) as PricingResponse
+      if (!json.data?.length) return
+
+      logger.info(`[fetchPricing] Got ${json.data.length} pricing items`)
+      this.postMessage({
+        type: 'pricingData',
+        models: json.data,
+        groupRatio: json.group_ratio ?? {},
+      })
+    } catch {
+      // Silent failure — WebView uses no pricing info as fallback
+      logger.warn('[fetchPricing] Request failed, pricing data unavailable')
+    }
+  }
+
   private async _getApiKeyForModels(): Promise<string | undefined> {
     try {
       return await this.apiClient.resolveApiKey()
@@ -420,19 +447,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private async _checkOnboarding(): Promise<void> {
     try {
-      const apiKey = await this.apiClient.resolveApiKey()
-      if (!apiKey) {
-        // Also check if any group tokens exist
-        if (this._secretStore) {
-          const groups = TOKEN_GROUPS.map(g => g.id)
-          const status = await this._secretStore.getGroupTokenStatus(groups)
-          const hasAnyToken = Object.values(status).some(Boolean)
-          if (!hasAnyToken) {
-            this.postMessage({ type: 'show_onboarding' })
-          }
-        } else {
+      // Only check group tokens — general API key may be auto-seeded default
+      if (this._secretStore) {
+        const groups = TOKEN_GROUPS.map(g => g.id)
+        const status = await this._secretStore.getGroupTokenStatus(groups)
+        const hasGroupToken = Object.values(status).some(Boolean)
+        if (!hasGroupToken) {
           this.postMessage({ type: 'show_onboarding' })
         }
+      } else {
+        this.postMessage({ type: 'show_onboarding' })
       }
     } catch {
       this.postMessage({ type: 'show_onboarding' })

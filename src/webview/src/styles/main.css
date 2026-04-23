@@ -697,6 +697,31 @@ body {
   color: var(--lc-text-tertiary);
 }
 
+.model-ratio {
+  font-size: 10px;
+  color: var(--lc-text-primary);
+  opacity: 0.5;
+  margin-left: 4px;
+  font-family: monospace;
+}
+
+.model-ratio-free {
+  opacity: 1;
+  color: var(--lc-green, #22c55e);
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.model-cap-tag {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--vscode-badge-background, rgba(100,100,100,0.3));
+  color: var(--vscode-badge-foreground, #ccc);
+  margin-left: 2px;
+  vertical-align: middle;
+}
+
 .check-icon {
   color: var(--lc-accent-text);
   flex-shrink: 0;

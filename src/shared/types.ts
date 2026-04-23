@@ -22,6 +22,26 @@ export interface StoredChatMessage {
 }
 
 /**
+ * Pricing item from smoothlink.ai/api/pricing.
+ */
+export interface PricingItem {
+  model_name: string
+  model_ratio: number
+  enable_groups: string[]
+  tags?: string
+  description?: string
+  quota_type?: number // 1 = free model
+}
+
+/**
+ * Full pricing API response shape.
+ */
+export interface PricingResponse {
+  data: PricingItem[]
+  group_ratio?: Record<string, number>
+}
+
+/**
  * Messages sent from the Extension Host to the WebView.
  */
 /**
@@ -68,6 +88,7 @@ export type ExtToWebMsg =
   | { type: 'open_settings'; tab?: string; highlightGroup?: string }
   | { type: 'fileContent'; filepath: string; content: string; name: string }
   | { type: 'historyList'; sessions: SessionSummary[] }
+  | { type: 'pricingData'; models: PricingItem[]; groupRatio: Record<string, number> }
 
 /**
  * Session summary for history list.

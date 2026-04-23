@@ -19,7 +19,7 @@ import { useChat } from './composables/useChat'
 import { useVSCode } from './composables/useVSCode'
 import { usePlatform } from './composables/usePlatform'
 
-const { messages, sendMessage, isLoading, currentModel, models, modelsLoading, changeModel, clearMessages, sessionStats } = useChat()
+const { messages, sendMessage, isLoading, currentModel, models, modelsLoading, changeModel, clearMessages, sessionStats, pricingData, pricingGroupRatio } = useChat()
 const { postMessage, onMessage } = useVSCode()
 const { modKey } = usePlatform()
 
@@ -222,13 +222,7 @@ function handleCodeQuote(code: string, language: string) {
         <span class="header-title">LinkCode</span>
       </div>
       <div class="header-right">
-        <button
-          class="header-btn cost-btn"
-          title="费用看板"
-          @click="showCostDashboard = !showCostDashboard"
-        >
-          <span class="cost-btn-text">¥{{ sessionStats.estimatedCost.toFixed(2) }}</span>
-        </button>
+        <!-- Cost display hidden until real billing API is connected -->
         <button
           v-if="!isEmpty"
           class="header-btn"
@@ -256,8 +250,8 @@ function handleCodeQuote(code: string, language: string) {
           @click="handleOpenSettings"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+            <circle cx="12" cy="12" r="3"/>
           </svg>
         </button>
       </div>
@@ -386,6 +380,8 @@ function handleCodeQuote(code: string, language: string) {
       :models="models"
       :loading="modelsLoading"
       :filter-unlocked="filterUnlockedModels"
+      :pricing-data="pricingData"
+      :group-ratio="pricingGroupRatio"
       @select="handleModelChange"
       @close="showModelSelector = false; filterUnlockedModels = false"
     />

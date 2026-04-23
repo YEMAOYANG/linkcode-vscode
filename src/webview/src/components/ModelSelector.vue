@@ -9,6 +9,14 @@ interface ModelInfo {
   tag?: string
 }
 
+interface PricingItemProp {
+  model_name: string
+  model_ratio: number
+  enable_groups: string[]
+  tags?: string
+  quota_type?: number
+}
+
 interface ModelGroup {
   title: string
   emoji: string
@@ -43,6 +51,8 @@ const props = defineProps<{
   models: ModelInfo[]
   loading?: boolean
   filterUnlocked?: boolean
+  pricingData?: PricingItemProp[]
+  groupRatio?: Record<string, number>
 }>()
 
 const emit = defineEmits<{
@@ -69,6 +79,31 @@ onMounted(() => {
 })
 
 onUnmounted(() => { cleanup?.() })
+
+/** Pricing lookup: model_name → { ratio, tags[], isFree } */
+const pricingMap = computed(() => {
+  const map: Record<string, { ratio: number; tags: string[]; isFree: boolean }> = {}
+  const gr = props.groupRatio ?? {}
+  for (const item of (props.pricingData ?? [])) {
+    const isFree = item.quota_type === 1
+    const ratio = item.model_ratio / 2
+    map[item.model_name] = {
+      ratio,
+      tags: item.tags ? item.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+      isFree,
+    }
+  }
+  return map
+})
+
+/** Important capability tags to display */
+const SHOWN_TAGS = new Set(['Reasoning', 'Vision', 'Tools', 'Audio'])
+
+/** Format ratio number: remove trailing zeros */
+function formatRatio(r: number): string {
+  // Show up to 3 decimal places, strip trailing zeros
+  return r.toFixed(3).replace(/\.?0+$/, '')
+}
 
 /** Provider → display group config */
 const PROVIDER_GROUPS: Record<string, { title: string; emoji: string; order: number }> = {
@@ -272,6 +307,8 @@ function getTagClass(tag?: string): string {
               <div class="model-info">
                 <div class="model-name">
                   {{ model.label }}
+                  <span v-if="pricingMap[model.id]?.isFree" class="model-ratio model-ratio-free">免费</span>
+                  <span v-else-if="pricingMap[model.id]" class="model-ratio">x{{ formatRatio(pricingMap[model.id].ratio) }}</span>
                   <span v-if="!isModelUnlocked(model.id)" class="lock-icon">🔒</span>
                   <span
                     v-if="model.tag && isModelUnlocked(model.id)"
@@ -280,6 +317,11 @@ function getTagClass(tag?: string): string {
                   >
                     {{ model.tag }}
                   </span>
+                  <span
+                    v-for="tag in (pricingMap[model.id]?.tags ?? []).filter(t => SHOWN_TAGS.has(t))"
+                    :key="tag"
+                    class="model-cap-tag"
+                  >{{ tag }}</span>
                 </div>
                 <div class="model-price">{{ model.provider }} · {{ model.id }}</div>
               </div>
