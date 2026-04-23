@@ -1,8 +1,12 @@
 import * as vscode from 'vscode'
 
-export class CodeLensProvider implements vscode.CodeLensProvider {
+export class CodeLensProvider implements vscode.CodeLensProvider, vscode.Disposable {
   private _onDidChangeCodeLenses = new vscode.EventEmitter<void>()
   public readonly onDidChangeCodeLenses = this._onDidChangeCodeLenses.event
+
+  dispose(): void {
+    this._onDidChangeCodeLenses.dispose()
+  }
 
   public provideCodeLenses(
     document: vscode.TextDocument,

@@ -12,7 +12,7 @@ const messagesListRef = ref<HTMLElement | null>(null)
 
 function handleSend(text: string) {
   sendMessage(text)
-  postMessage({ type: 'sendMessage', payload: text })
+  postMessage({ type: 'sendMessage', text })
 }
 
 function scrollToBottom() {

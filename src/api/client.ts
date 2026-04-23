@@ -33,12 +33,17 @@ export class ApiClient {
     const endpoint = this.getEndpoint()
 
     const controller = new AbortController()
-    const effectiveSignal = signal ?? controller.signal
 
-    // Timeout control
+    // Timeout control — always abort our own controller
     const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
+
+    // Forward external signal to our controller
     if (signal) {
-      signal.addEventListener('abort', () => controller.abort(), { once: true })
+      if (signal.aborted) {
+        controller.abort()
+      } else {
+        signal.addEventListener('abort', () => controller.abort(), { once: true })
+      }
     }
 
     try {
@@ -46,7 +51,7 @@ export class ApiClient {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
-        signal: effectiveSignal,
+        signal: controller.signal,
       })
 
       if (!res.ok) {
@@ -81,11 +86,14 @@ export class ApiClient {
     const endpoint = this.getEndpoint()
 
     const controller = new AbortController()
-    const effectiveSignal = signal ?? controller.signal
 
     const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
     if (signal) {
-      signal.addEventListener('abort', () => controller.abort(), { once: true })
+      if (signal.aborted) {
+        controller.abort()
+      } else {
+        signal.addEventListener('abort', () => controller.abort(), { once: true })
+      }
     }
 
     try {
@@ -93,7 +101,7 @@ export class ApiClient {
         method: 'POST',
         headers,
         body: JSON.stringify({ messages, stream: true }),
-        signal: effectiveSignal,
+        signal: controller.signal,
       })
 
       if (!res.ok) {
@@ -108,7 +116,7 @@ export class ApiClient {
         )
       }
 
-      yield* parseSSEStream(res, effectiveSignal)
+      yield* parseSSEStream(res, controller.signal)
     } finally {
       clearTimeout(timeout)
     }

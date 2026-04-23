@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
+import { MAX_CONTEXT_LINES_BEFORE, MAX_CONTEXT_LINES_AFTER } from '../shared/constants'
 
-export interface CodeContext {
+interface CompletionContext {
   prefix: string
   suffix: string
   language: string
@@ -15,19 +16,19 @@ export function extractContext(
   editor: vscode.TextEditor,
   maxLinesBefore?: number,
   maxLinesAfter?: number
-): CodeContext
+): CompletionContext
 export function extractContext(
   document: vscode.TextDocument,
   position: vscode.Position,
   maxLinesBefore?: number,
   maxLinesAfter?: number
-): CodeContext
+): CompletionContext
 export function extractContext(
   editorOrDoc: vscode.TextEditor | vscode.TextDocument,
   positionOrMaxBefore?: vscode.Position | number,
   maxLinesBeforeOrAfter?: number,
   maxLinesAfterArg?: number
-): CodeContext {
+): CompletionContext {
   let document: vscode.TextDocument
   let position: vscode.Position
   let maxLinesBefore: number
@@ -37,14 +38,14 @@ export function extractContext(
     // TextEditor overload
     document = editorOrDoc.document
     position = editorOrDoc.selection.active
-    maxLinesBefore = (positionOrMaxBefore as number | undefined) ?? 100
-    maxLinesAfter = maxLinesBeforeOrAfter ?? 50
+    maxLinesBefore = (positionOrMaxBefore as number | undefined) ?? MAX_CONTEXT_LINES_BEFORE
+    maxLinesAfter = maxLinesBeforeOrAfter ?? MAX_CONTEXT_LINES_AFTER
   } else {
     // TextDocument + Position overload
     document = editorOrDoc
     position = positionOrMaxBefore as vscode.Position
-    maxLinesBefore = maxLinesBeforeOrAfter ?? 100
-    maxLinesAfter = maxLinesAfterArg ?? 50
+    maxLinesBefore = maxLinesBeforeOrAfter ?? MAX_CONTEXT_LINES_BEFORE
+    maxLinesAfter = maxLinesAfterArg ?? MAX_CONTEXT_LINES_AFTER
   }
 
   const startLine = Math.max(0, position.line - maxLinesBefore)
@@ -70,15 +71,4 @@ export function extractContext(
     language: document.languageId,
     filepath: document.uri.fsPath,
   }
-}
-
-/**
- * Get the full text of the currently selected code (or the current line if nothing is selected).
- */
-export function getSelectedCode(editor: vscode.TextEditor): string {
-  const selection = editor.selection
-  if (selection.isEmpty) {
-    return editor.document.lineAt(selection.active.line).text
-  }
-  return editor.document.getText(selection)
 }

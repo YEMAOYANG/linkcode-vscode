@@ -56,6 +56,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // CodeLens
   const codeLensProvider = new CodeLensProvider()
+  context.subscriptions.push(codeLensProvider)
   context.subscriptions.push(
     vscode.languages.registerCodeLensProvider(
       { pattern: '**' },

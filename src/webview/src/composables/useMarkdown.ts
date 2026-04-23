@@ -26,10 +26,12 @@ const marked = new Marked({
       return `<div data-shiki-placeholder="${id}"></div>`
     },
     codespan({ text }: { text: string }) {
-      return `<code class="inline-code">${text}</code>`
+      return `<code class="inline-code">${escapeHtml(text)}</code>`
     },
     link({ href, text }: { href: string; text: string }) {
-      return `<a href="${href}" title="${text}" class="md-link">${text}</a>`
+      // Only allow safe URL schemes
+      const safeHref = isSafeUrl(href) ? href : '#'
+      return `<a href="${escapeHtml(safeHref)}" title="${escapeHtml(text)}" class="md-link">${text}</a>`
     },
   },
   gfm: true,
@@ -52,16 +54,14 @@ export function useMarkdown() {
     for (const block of codeBlocks) {
       const highlighted = await highlight(block.code, block.lang)
       const langLabel = block.lang || 'text'
+      // Encode the code for the data attribute (used by copy handler)
+      const encodedCode = encodeURIComponent(block.code)
 
       const codeBlockHtml = `
         <div class="code-block-wrapper">
           <div class="code-block-header">
-            <span class="code-block-lang">${langLabel}</span>
-            <button class="code-block-copy" onclick="
-              navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(block.code)}'))
-                .then(() => { this.textContent = 'Copied!'; setTimeout(() => this.textContent = 'Copy', 2000) })
-                .catch(() => { this.textContent = 'Failed'; setTimeout(() => this.textContent = 'Copy', 2000) })
-            ">Copy</button>
+            <span class="code-block-lang">${escapeHtml(langLabel)}</span>
+            <button class="code-block-copy" data-code="${encodedCode}">Copy</button>
           </div>
           <div class="code-block-body">${highlighted}</div>
         </div>`
@@ -72,13 +72,32 @@ export function useMarkdown() {
       )
     }
 
-    // Sanitise output
+    // Sanitise output — no onclick allowed, use data attributes + event delegation
     return DOMPurify.sanitize(html, {
       ADD_TAGS: ['span'],
-      ADD_ATTR: ['style', 'class', 'data-shiki-placeholder', 'onclick'],
+      ADD_ATTR: ['style', 'class', 'data-code'],
       ALLOW_DATA_ATTR: true,
     })
   }
 
   return { renderMarkdown }
+}
+
+/** Escape HTML special characters to prevent injection */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+/** Check if a URL uses a safe scheme */
+function isSafeUrl(href: string): boolean {
+  try {
+    const url = new URL(href, 'https://placeholder.invalid')
+    return ['http:', 'https:', 'mailto:'].includes(url.protocol)
+  } catch {
+    return false
+  }
 }

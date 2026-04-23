@@ -1,12 +1,9 @@
+import { randomBytes } from 'crypto'
+
 /**
- * Generate a random nonce string for WebView CSP.
+ * Generate a cryptographically random nonce string for WebView CSP.
+ * Uses Node.js crypto module instead of Math.random() for security.
  */
 export function getNonce(): string {
-  let text = ''
-  const possible =
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length))
-  }
-  return text
+  return randomBytes(24).toString('base64url')
 }

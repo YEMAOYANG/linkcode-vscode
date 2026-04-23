@@ -2,7 +2,7 @@ import * as vscode from 'vscode'
 import type { ApiClient } from '../api/client'
 import { extractContext } from '../utils/context'
 import { CompletionCache } from '../completion/cache'
-import { CONFIG_SECTION } from '../shared/constants'
+import { CONFIG_SECTION, DEBOUNCE_MS } from '../shared/constants'
 
 export class InlineCompletionProvider
   implements vscode.InlineCompletionItemProvider, vscode.Disposable
@@ -58,7 +58,7 @@ export class InlineCompletionProvider
     }
 
     // Debounce: wait before making the request
-    const debounceMs = config.get<number>('completionDebounceMs') ?? 300
+    const debounceMs = config.get<number>('completionDebounceMs') ?? DEBOUNCE_MS
     if (this.debounceTimer !== undefined) {
       clearTimeout(this.debounceTimer)
     }
@@ -76,7 +76,7 @@ export class InlineCompletionProvider
     const ctx = extractContext(document, position)
 
     // Wire cancellation token to abort controller
-    token.onCancellationRequested(() => this.abortController?.abort())
+    const cancelDisposable = token.onCancellationRequested(() => this.abortController?.abort())
 
     try {
       const completion = await this.apiClient.complete(
@@ -104,6 +104,8 @@ export class InlineCompletionProvider
       ])
     } catch {
       return null
+    } finally {
+      cancelDisposable.dispose()
     }
   }
 }

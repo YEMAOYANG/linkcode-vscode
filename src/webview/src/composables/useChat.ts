@@ -26,9 +26,12 @@ export function useChat() {
     cleanup = onMessage((event: MessageEvent) => {
       const msg = event.data as {
         type: string
-        payload?: string
+        content?: string
+        message?: string
         action?: string
-        error?: string
+        payload?: string
+        code?: string
+        language?: string
         messages?: ChatMsg[]
       }
 
@@ -41,35 +44,39 @@ export function useChat() {
           }
           break
 
-        case 'assistantMessage':
-          messages.value.push({
-            id: generateId(),
-            role: 'assistant',
-            content: msg.payload ?? '',
-          })
-          isLoading.value = false
+        case 'stream_start':
+          // Extension is about to stream — create an empty assistant bubble
+          isLoading.value = true
+          messages.value.push({ id: generateId(), role: 'assistant', content: '' })
           break
 
-        case 'streamToken': {
-          // Append to last assistant message (or create one)
+        case 'stream_chunk': {
+          // Append token to the last assistant message
           const lastMsg = messages.value[messages.value.length - 1]
-          if (!lastMsg || lastMsg.role !== 'assistant' || !isLoading.value) {
+          if (!lastMsg || lastMsg.role !== 'assistant') {
             messages.value.push({ id: generateId(), role: 'assistant', content: '' })
           }
           const current = messages.value[messages.value.length - 1]
-          current.content += msg.payload ?? ''
+          current.content += msg.content ?? ''
           break
         }
 
-        case 'streamDone':
+        case 'stream_end':
           isLoading.value = false
           break
 
-        case 'streamError':
+        case 'stream_error':
           isLoading.value = false
+          // Append error info to the current assistant message
+          if (msg.message) {
+            const last = messages.value[messages.value.length - 1]
+            if (last && last.role === 'assistant') {
+              last.content += `\n\n⚠️ Error: ${msg.message}`
+            }
+          }
           break
 
-        case 'userAction':
+        case 'user_action':
           // Triggered by CodeLens / command (explain, refactor, etc.)
           messages.value.push({
             id: generateId(),

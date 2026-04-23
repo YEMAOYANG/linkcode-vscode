@@ -1,21 +1,21 @@
 /**
- * Creates a debounced version of the given function.
- * The debounced function delays invoking `fn` until after `delayMs`
- * milliseconds have elapsed since the last invocation.
+ * Creates a debounced version of the given function that delays
+ * invocation until after `delayMs` milliseconds have elapsed
+ * since the last call.
  */
-export function debounce<T extends (...args: unknown[]) => unknown>(
+export function debounce<T extends (...args: unknown[]) => void>(
   fn: T,
   delayMs: number
 ): (...args: Parameters<T>) => void {
   let timer: ReturnType<typeof setTimeout> | undefined
 
-  return (...args: Parameters<T>) => {
+  return (...args: Parameters<T>): void => {
     if (timer !== undefined) {
       clearTimeout(timer)
     }
     timer = setTimeout(() => {
-      fn(...args)
       timer = undefined
+      fn(...args)
     }, delayMs)
   }
 }

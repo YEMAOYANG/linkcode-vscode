@@ -1,7 +1,6 @@
-import { ref, type Ref } from 'vue'
 import { createHighlighter, type Highlighter } from 'shiki'
 
-const highlighterRef: Ref<Highlighter | null> = ref(null)
+let highlighterInstance: Highlighter | null = null
 const loadedLanguages = new Set<string>()
 let initPromise: Promise<Highlighter> | null = null
 
@@ -12,15 +11,16 @@ const THEME = 'github-dark'
  * Languages are loaded on-demand via `ensureLanguage`.
  */
 async function getHighlighter(): Promise<Highlighter> {
-  if (highlighterRef.value) return highlighterRef.value
+  if (highlighterInstance) return highlighterInstance
 
   if (!initPromise) {
+    const defaultLangs = ['javascript', 'typescript', 'html', 'css', 'json', 'markdown', 'python', 'bash', 'shell'] as const
     initPromise = createHighlighter({
       themes: [THEME],
-      langs: ['javascript', 'typescript', 'html', 'css', 'json', 'markdown', 'python', 'bash', 'shell'],
+      langs: [...defaultLangs],
     }).then((hl) => {
-      highlighterRef.value = hl
-      for (const lang of ['javascript', 'typescript', 'html', 'css', 'json', 'markdown', 'python', 'bash', 'shell']) {
+      highlighterInstance = hl
+      for (const lang of defaultLangs) {
         loadedLanguages.add(lang)
       }
       return hl
@@ -70,7 +70,7 @@ export function useHighlight() {
       const resolvedLang = await ensureLanguage(hl, lang)
 
       if (resolvedLang === 'plaintext') {
-        return escapeHtml(code)
+        return `<pre><code>${escapeHtml(code)}</code></pre>`
       }
 
       return hl.codeToHtml(code, {

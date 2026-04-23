@@ -1,17 +1,11 @@
 import * as vscode from 'vscode'
-import type { ExtToWebMsg, WebToExtMsg } from '../shared/types'
+import type { ExtToWebMsg, WebToExtMsg, StoredChatMessage } from '../shared/types'
 import type { ChatMessage } from '../api/types'
 import type { ApiClient } from '../api/client'
 import { getNonce } from '../utils/crypto'
 import { Logger } from '../utils/logger'
 
 const HISTORY_KEY = 'linkcode.chatHistory'
-
-interface StoredMessage {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-}
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'linkcode.chatView'
@@ -42,8 +36,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this._getHtml(webviewView.webview)
 
-    // Handle messages from the WebView
-    webviewView.webview.onDidReceiveMessage((msg: WebToExtMsg) => {
+    // Handle messages from the WebView — dispose with the view
+    const messageDisposable = webviewView.webview.onDidReceiveMessage((msg: WebToExtMsg) => {
       switch (msg.type) {
         case 'sendMessage':
           this._handleSendMessage(msg.text)
@@ -59,6 +53,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break
       }
     })
+
+    // Clean up listener when the view is disposed
+    webviewView.onDidDispose(() => {
+      messageDisposable.dispose()
+      this._abortController?.abort()
+      this._view = undefined
+    })
   }
 
   /**
@@ -70,7 +71,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   /** Load persisted messages and send to webview */
   private _sendHistory(): void {
-    const stored = this.globalState.get<StoredMessage[]>(HISTORY_KEY, [])
+    const stored = this.globalState.get<StoredChatMessage[]>(HISTORY_KEY, [])
     this._view?.webview.postMessage({
       type: 'loadHistory',
       messages: stored,
@@ -78,7 +79,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /** Save messages from webview to globalState */
-  private _saveHistory(messages: StoredMessage[]): void {
+  private _saveHistory(messages: StoredChatMessage[]): void {
     this.globalState.update(HISTORY_KEY, messages)
   }
 
@@ -143,7 +144,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource};">
+    content="default-src 'none'; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; img-src ${webview.cspSource} data:;">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="${styleUri}">
   <title>LinkCode Chat</title>

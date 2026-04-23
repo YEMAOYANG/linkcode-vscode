@@ -20,10 +20,21 @@ function getApi(): VSCodeApi {
   return vscodeApi
 }
 
+/**
+ * WebToExtMsg-compatible message shape.
+ * We use Record<string, unknown> with a required `type` field
+ * to keep the webview decoupled from the extension's exact type definitions
+ * (since shared/types.ts lives outside the webview build).
+ */
+interface WebviewMessage {
+  type: string
+  [key: string]: unknown
+}
+
 export function useVSCode() {
   const api = getApi()
 
-  function postMessage(message: Record<string, unknown>): void {
+  function postMessage(message: WebviewMessage): void {
     api.postMessage(message)
   }
 

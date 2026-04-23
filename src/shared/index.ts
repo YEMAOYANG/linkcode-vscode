@@ -1,7 +1,7 @@
 /**
  * Shared module — cross-module types, constants, and errors.
  */
-export type { ExtToWebMsg, WebToExtMsg, CodeContext } from './types'
+export type { ExtToWebMsg, WebToExtMsg, CodeContext, StoredChatMessage } from './types'
 export { LinkCodeError, ApiError, AuthError } from './errors'
 export {
   DEBOUNCE_MS,
