@@ -132,7 +132,7 @@
         {
           "id": "linkcode-sidebar",
           "title": "LinkCode",
-          "icon": "$(sparkle)"
+          "icon": "assets/icon.svg"
         }
       ]
     },
