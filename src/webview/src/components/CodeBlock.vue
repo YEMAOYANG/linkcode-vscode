@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { useHighlight } from '../composables/useHighlight'
+import { useVSCode } from '../composables/useVSCode'
 
 const props = defineProps<{
   code: string
@@ -8,6 +9,7 @@ const props = defineProps<{
 }>()
 
 const { highlight } = useHighlight()
+const { postMessage } = useVSCode()
 
 const highlightedHtml = ref('')
 const buttonText = ref('Copy')
@@ -36,6 +38,7 @@ async function handleCopy() {
   }
 }
 function handleApply() {
+  postMessage({ type: 'applyEdit', code: props.code })
   applyText.value = 'Applied ✓'
   setTimeout(() => {
     applyText.value = 'Apply'

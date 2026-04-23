@@ -71,11 +71,7 @@ export function registerCommands(
           )
           return
         }
-        chatProvider.postMessage({
-          type: 'user_action',
-          action: 'explain',
-          payload: selectedText,
-        })
+        chatProvider.handleUserAction('explain', selectedText)
         vscode.commands.executeCommand('linkcode.chatView.focus')
       }
     )
@@ -94,11 +90,7 @@ export function registerCommands(
           )
           return
         }
-        chatProvider.postMessage({
-          type: 'user_action',
-          action: 'refactor',
-          payload: selectedText,
-        })
+        chatProvider.handleUserAction('refactor', selectedText)
         vscode.commands.executeCommand('linkcode.chatView.focus')
       }
     )

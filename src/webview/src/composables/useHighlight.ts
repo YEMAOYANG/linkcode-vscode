@@ -1,4 +1,5 @@
 import { createHighlighter, type Highlighter } from 'shiki'
+import { escapeHtml } from './htmlUtils'
 
 let highlighterInstance: Highlighter | null = null
 const loadedLanguages = new Set<string>()
@@ -83,12 +84,4 @@ export function useHighlight() {
   }
 
   return { highlight }
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
 }

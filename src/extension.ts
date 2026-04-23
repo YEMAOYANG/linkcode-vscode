@@ -16,14 +16,13 @@ export function activate(context: vscode.ExtensionContext): void {
   const secretStore = new SecretStore(context.secrets)
   const getApiKey = () => secretStore.getApiKey()
 
-  // Seed default API key into SecretStorage (only if not already set)
+  // Auto-seed default API key on first install (only if not already set)
+  const DEFAULT_API_KEY = 'sk-iYhVnfY27MIdhT73A84eJpt3x7NMSbLMCjVJgWR5OLifKT1U'
   context.secrets.get(SECRET_KEY_API).then((existing) => {
     if (!existing) {
-      context.secrets.store(
-        SECRET_KEY_API,
-        'sk-iYhVnfY27MIdhT73A84eJpt3x7NMSbLMCjVJgWR5OLifKT1U'
-      )
-      logger.info('Default Smoothlink API key seeded into SecretStorage')
+      context.secrets.store(SECRET_KEY_API, DEFAULT_API_KEY).then(() => {
+        logger.info('Default API key seeded into SecretStorage')
+      })
     }
   })
 

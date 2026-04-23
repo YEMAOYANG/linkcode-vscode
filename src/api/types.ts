@@ -19,8 +19,12 @@ export interface CompletionResponse {
 }
 
 export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system'
+  role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
+  name?: string
+  tool_calls?: Array<{ id: string; type: string; function: { name: string; arguments: string } }>
+  tool_call_id?: string
+  reasoning_content?: string
 }
 
 export interface ChatRequest {

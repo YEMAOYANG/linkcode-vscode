@@ -47,3 +47,30 @@ export const RECOMMENDED_MODELS = [
   { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Google', tag: '快速' },
   { id: 'gpt-5', label: 'GPT-5', provider: 'OpenAI', tag: '' },
 ] as const
+
+/**
+ * Model → Token Group mapping for Smoothlink multi-token routing.
+ * Each group requires a separate API token.
+ */
+export const MODEL_TO_GROUP: Record<string, string> = {
+  // Claude_aws
+  'claude-sonnet-4-6': 'Claude_aws',
+  'claude-opus-4-6': 'Claude_aws',
+  'claude-haiku-4-5-20251001': 'Claude_aws',
+  'claude-sonnet-4-5-20250929': 'Claude_aws',
+  'claude-opus-4-5-20251101': 'Claude_aws',
+  'claude-sonnet-4-20250514': 'Claude_aws',
+  // gpt_Azure
+  'gpt-5': 'gpt_Azure',
+  'gpt-5.1': 'gpt_Azure',
+  'gpt-5.2': 'gpt_Azure',
+  'gpt-5.4': 'gpt_Azure',
+  // gemini_Google
+  'gemini-2.5-pro': 'gemini_Google',
+  'gemini-2.5-flash': 'gemini_Google',
+  // deepseek_tencent
+  'deepseek-r1': 'deepseek_tencent',
+  'deepseek-v3': 'deepseek_tencent',
+  'deepseek-v3.1': 'deepseek_tencent',
+  'deepseek-v3.2': 'deepseek_tencent',
+}

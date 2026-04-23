@@ -54,10 +54,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this._saveHistory(msg.messages)
           break
         case 'changeModel':
-          this._handleChangeModel((msg as { type: 'changeModel'; modelId: string }).modelId)
+          this._handleChangeModel(msg.modelId)
           break
         case 'newChat':
           this._handleNewChat()
+          break
+        case 'applyEdit':
+          this._handleApplyEdit(msg.code)
           break
       }
     })
@@ -85,6 +88,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage(message)
   }
 
+  /**
+   * Handle a CodeLens/command action by sending it to the webview
+   * and triggering the chat flow.
+   */
+  public handleUserAction(action: string, payload: string): void {
+    // Notify webview to display the user action
+    this.postMessage({
+      type: 'user_action',
+      action: action as 'explain' | 'refactor' | 'review',
+      payload,
+    })
+    // Actually trigger the chat API call
+    const prompt = `[${action}]\n${payload}`
+    this._handleSendMessage(prompt)
+  }
+
   /** Send current model info to webview */
   private _sendModelInfo(): void {
     const config = vscode.workspace.getConfiguration(CONFIG_SECTION)
@@ -106,6 +125,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this._chatHistory = []
     this._abortController?.abort()
     this.postMessage({ type: 'chatCleared' })
+  }
+
+  /** Apply code from chat to the active editor */
+  private _handleApplyEdit(code: string): void {
+    const editor = vscode.window.activeTextEditor
+    if (!editor) {
+      vscode.window.showWarningMessage('LinkCode: No active editor to apply code to.')
+      return
+    }
+    const selection = editor.selection
+    const range = selection.isEmpty
+      ? new vscode.Range(selection.active, selection.active)
+      : selection
+    const edit = new vscode.WorkspaceEdit()
+    edit.replace(editor.document.uri, range, code)
+    vscode.workspace.applyEdit(edit)
   }
 
   /** Load persisted messages and send to webview */

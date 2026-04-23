@@ -101,6 +101,29 @@
           "type": "string",
           "default": "claude-haiku-4-5-20251001",
           "description": "Inline 代码补全专用模型（建议选速度快的小模型）"
+        },
+        "linkcode.apiTokens": {
+          "type": "object",
+          "default": {},
+          "description": "各分组的 API Token（key=分组名, value=token），用于多模型路由",
+          "properties": {
+            "Claude_aws": {
+              "type": "string",
+              "description": "Claude 系列模型 Token"
+            },
+            "gpt_Azure": {
+              "type": "string",
+              "description": "GPT 系列模型 Token"
+            },
+            "gemini_Google": {
+              "type": "string",
+              "description": "Gemini 系列模型 Token"
+            },
+            "deepseek_tencent": {
+              "type": "string",
+              "description": "DeepSeek 系列模型 Token"
+            }
+          }
         }
       }
     },
@@ -146,5 +169,6 @@
     "mocha": "^11.7.5",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.59.0"
-  }
+  },
+  "icon": "assets/icon.svg"
 }

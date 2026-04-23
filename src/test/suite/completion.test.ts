@@ -142,11 +142,11 @@ suite('shared/constants', () => {
 })
 
 suite('utils/crypto', () => {
-  test('getNonce should return 32-char alphanumeric string', async () => {
+  test('getNonce should return 32-char base64url string', async () => {
     const { getNonce } = await import('../../utils/crypto')
     const nonce = getNonce()
     assert.strictEqual(nonce.length, 32)
-    assert.match(nonce, /^[A-Za-z0-9]+$/)
+    assert.match(nonce, /^[A-Za-z0-9_-]+$/)
   })
 
   test('getNonce should return different values each call', async () => {

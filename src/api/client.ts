@@ -13,6 +13,7 @@ import {
   DEFAULT_MODEL,
   DEFAULT_COMPLETION_MODEL,
   DEFAULT_API_ENDPOINT,
+  MODEL_TO_GROUP,
 } from '../shared/constants'
 
 /**
@@ -35,9 +36,9 @@ export class ApiClient {
     signal?: AbortSignal
   ): Promise<string | null> {
     const logger = Logger.getInstance()
-    const headers = await this.getHeaders()
-    const endpoint = this.getEndpoint()
     const model = this.getCompletionModel()
+    const headers = await this.getHeaders(model)
+    const endpoint = this.getEndpoint()
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
@@ -115,9 +116,12 @@ export class ApiClient {
     messages: ChatMessage[],
     signal?: AbortSignal
   ): AsyncGenerator<ChatStreamChunk> {
-    const headers = await this.getHeaders()
-    const endpoint = this.getEndpoint()
     const model = this.getModel()
+    const headers = await this.getHeaders(model)
+    const endpoint = this.getEndpoint()
+
+    const logger = Logger.getInstance()
+    logger.info(`[streamChat] model=${model} endpoint=${endpoint}`)
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
@@ -162,11 +166,30 @@ export class ApiClient {
     }
   }
 
-  private async getHeaders(): Promise<Record<string, string>> {
-    const apiKey = await this.getApiKey()
-    if (!apiKey) {
-      throw new AuthError('API Key 未配置')
+  private async getHeaders(model?: string): Promise<Record<string, string>> {
+    const targetModel = model ?? this.getModel()
+    const group = MODEL_TO_GROUP[targetModel]
+
+    // Try group-specific token first, then fall back to general API key
+    let apiKey: string | undefined
+    if (group) {
+      const config = vscode.workspace.getConfiguration(CONFIG_SECTION)
+      const tokens = config.get<Record<string, string>>('apiTokens') ?? {}
+      apiKey = tokens[group]
     }
+
+    if (!apiKey) {
+      apiKey = await this.getApiKey()
+    }
+
+    if (!apiKey) {
+      throw new AuthError(
+        group
+          ? `分组 ${group} 的 API Token 未配置，且无通用 API Key`
+          : 'API Key 未配置'
+      )
+    }
+
     return {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,

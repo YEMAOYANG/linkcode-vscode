@@ -86,8 +86,8 @@ export function useChat() {
           if (msg.cost) {
             const last = messages.value[messages.value.length - 1]
             if (last && last.role === 'assistant') {
-              last.cost = msg.cost as string
-              if (msg.savings) last.savings = msg.savings as string
+              last.cost = msg.cost
+              if (msg.savings) last.savings = msg.savings
             }
           }
           break
@@ -105,12 +105,12 @@ export function useChat() {
 
         case 'user_action':
           // Triggered by CodeLens / command (explain, refactor, etc.)
+          // Extension host triggers the API call; stream_start will set isLoading
           messages.value.push({
             id: generateId(),
             role: 'user',
             content: `[${msg.action}]\n${msg.payload ?? ''}`,
           })
-          isLoading.value = true
           break
       }
     })
