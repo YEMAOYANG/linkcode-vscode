@@ -3,6 +3,7 @@ import type { ApiClient } from '../api/client'
 import { extractContext } from '../utils/context'
 import { CompletionCache } from '../completion/cache'
 import { CONFIG_SECTION, DEBOUNCE_MS } from '../shared/constants'
+import { Logger } from '../utils/logger'
 
 export class InlineCompletionProvider
   implements vscode.InlineCompletionItemProvider, vscode.Disposable
@@ -102,7 +103,10 @@ export class InlineCompletionProvider
           new vscode.Range(position, position)
         ),
       ])
-    } catch {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name !== 'AbortError') {
+        Logger.getInstance().error('[InlineCompletion] Error:', err)
+      }
       return null
     } finally {
       cancelDisposable.dispose()

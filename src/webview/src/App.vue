@@ -15,6 +15,9 @@ import InlineEditPanel from './components/InlineEditPanel.vue'
 import Login from './components/Login.vue'
 import UpgradePrompt from './components/UpgradePrompt.vue'
 import type { ErrorType } from './components/ErrorState.vue'
+import type { ImageAttachment } from './components/ImageUpload.vue'
+import type { AttachedFile } from './components/FileDragDrop.vue'
+import type { QuotedCode } from './components/ChatInput.vue'
 import { useChat } from './composables/useChat'
 import { useVSCode } from './composables/useVSCode'
 import { usePlatform } from './composables/usePlatform'
@@ -92,6 +95,11 @@ onMounted(() => {
       case 'show_inline_edit':
         showInlineEdit.value = true
         break
+      case 'quote_code': {
+        const qcMsg = msg as { type: string; code: string; language: string }
+        chatInputRef.value?.setQuotedCode(qcMsg.code, qcMsg.language)
+        break
+      }
       case 'show_login':
         showLogin.value = true
         break
@@ -121,12 +129,29 @@ onUnmounted(() => {
 
 const isEmpty = computed(() => messages.value.length === 0)
 
-function handleSend(text: string) {
-  // Clear any error on new message
+interface SendOptions {
+  images?: ImageAttachment[]
+  files?: AttachedFile[]
+  quotedCode?: QuotedCode | null
+}
+
+function handleSend(text: string, options?: SendOptions) {
   errorState.value = null
   tokenMissingInfo.value = null
-  sendMessage(text)
-  postMessage({ type: 'sendMessage', text })
+
+  let fullText = text
+  if (options?.quotedCode) {
+    fullText = `\`\`\`${options.quotedCode.language}\n${options.quotedCode.code}\n\`\`\`\n\n${text}`
+  }
+
+  if (options?.images?.length) {
+    for (const img of options.images) {
+      postMessage({ type: 'attachImage', name: img.name, base64: img.base64 })
+    }
+  }
+
+  sendMessage(fullText)
+  postMessage({ type: 'sendMessage', text: fullText })
 }
 
 function scrollToBottom() {
@@ -293,7 +318,7 @@ function handleCodeQuote(code: string, language: string) {
         <div class="tips-area">
           <h4>💡 快捷提示</h4>
           <ul>
-            <li>选中代码按 {{ modKey }}I 直接引用</li>
+            <li>选中代码按 {{ modKey }}+Shift+I 直接引用</li>
             <li>输入 @ 引用文件和项目上下文</li>
             <li>拖拽文件到输入框快速引用</li>
           </ul>

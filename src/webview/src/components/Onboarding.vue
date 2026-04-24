@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useVSCode } from '../composables/useVSCode'
 import { usePlatform } from '../composables/usePlatform'
 import { MODEL_TO_GROUP } from '../../../shared/constants'
@@ -103,11 +103,13 @@ const cleanupValidation = onMessage((event: MessageEvent) => {
       verifying.value = false
       if (msg.success && msg.models) {
         verifyResult.value = { success: true, message: '✓ Token 有效' }
-        // Detect group from models
         const detected = detectGroup(msg.models)
         if (detected) {
           quickDetectedGroup.value = detected
           quickDetectedModels.value = msg.models
+          // Sync to group config side
+          groupTokens.value[detected] = quickToken.value.trim()
+          groupVerified.value[detected] = true
         }
       } else {
         verifyResult.value = { success: false, message: `✗ 验证失败: ${msg.message || '请检查 Token'}` }
@@ -148,6 +150,22 @@ const hasAnyToken = computed(() => {
   return Object.values(groupVerified.value).some(Boolean)
 })
 
+watch(quickToken, (val) => {
+  if (!val.trim()) {
+    verifyResult.value = null
+    quickDetectedGroup.value = null
+    quickDetectedModels.value = []
+  }
+})
+
+watch(groupTokens, (tokens) => {
+  for (const groupId of Object.keys(groupVerified.value)) {
+    if (!tokens[groupId]?.trim()) {
+      groupVerified.value[groupId] = false
+    }
+  }
+}, { deep: true })
+
 const progressDots = computed(() => {
   return [1, 2, 3, 4].map(n => ({
     step: n,
@@ -181,6 +199,13 @@ function saveQuickToken() {
   }
 }
 
+function resetQuickVerify() {
+  verifyResult.value = null
+  quickDetectedGroup.value = null
+  quickDetectedModels.value = []
+  quickToken.value = ''
+}
+
 function verifyGroupToken(groupId: string) {
   const token = groupTokens.value[groupId]?.trim()
   if (!token) return
@@ -205,8 +230,8 @@ function finishOnboarding() {
 
 const shortcuts = [
   { icon: 'tab', name: '接受补全', desc: '接受 Ghost Text 建议', keys: ['Tab'] },
-  { icon: 'sparkle', name: '引用代码到 Chat', desc: '选中代码 → 发送到 AI 对话', keys: [modKey, 'I'] },
-  { icon: 'pencil', name: 'Inline Edit', desc: '选中代码原地编辑', keys: [modKey, 'K'] },
+  { icon: 'sparkle', name: '引用代码到 Chat', desc: '选中代码 → 发送到 AI 对话', keys: [modKey, 'Shift', 'I'] },
+  { icon: 'pencil', name: 'Inline Edit', desc: '选中代码原地编辑', keys: [modKey, 'Shift', 'K'] },
   { icon: 'chat', name: '打开 Chat 面板', desc: '与 AI 对话', keys: [modKey, 'Shift', 'L'] },
   { icon: 'review', name: '代码审查', desc: 'Git Diff 一键审查', keys: [modKey, 'Shift', 'R'] },
 ]
@@ -257,7 +282,7 @@ const shortcuts = [
         </div>
 
         <button class="ob-btn ob-btn-primary" @click="nextStep">
-          开始配置 →
+          开始配置 <svg class="ob-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
         </button>
         <div class="ob-skip" @click="emit('skip')">稍后再说，先体验免费额度</div>
       </template>
@@ -328,6 +353,7 @@ const shortcuts = [
                   </span>
                   <span v-if="quickDetectedModels.length > 4" class="ob-more-models">+{{ quickDetectedModels.length - 4 }} 个</span>
                 </div>
+                <button class="ob-reverify-btn" @click="resetQuickVerify">更换令牌</button>
               </div>
 
               <!-- Recommend more groups -->
@@ -386,17 +412,17 @@ const shortcuts = [
         </template>
 
         <div class="ob-btn-row">
-          <button class="ob-btn" @click="prevStep">← 上一步</button>
+          <button class="ob-btn" @click="prevStep"><svg class="ob-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> 上一步</button>
           <button v-if="quickDetectedGroup" class="ob-btn" @click="saveQuickToken(); nextStep()">
             跳过，稍后设置
           </button>
           <button class="ob-btn ob-btn-primary" :disabled="!hasAnyToken" @click="saveQuickToken(); nextStep()">
-            继续 →
+            继续 <svg class="ob-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </button>
         </div>
 
         <div class="ob-help">
-          📋 还没有 Token？去 <a href="https://smoothlink.ai" @click.prevent="postMessage({ type: 'openExternal', url: 'https://smoothlink.ai/register' })">Smoothlink 获取</a> →
+          📋 还没有 Token？去 <a href="https://smoothlink.ai" @click.prevent="postMessage({ type: 'openExternal', url: 'https://smoothlink.ai/register' })">Smoothlink 获取</a>
         </div>
         <div class="ob-hint">💡 新用户注册即送 ¥5 免费额度</div>
       </template>
@@ -424,8 +450,8 @@ const shortcuts = [
         </div>
 
         <div class="ob-btn-row">
-          <button class="ob-btn" @click="prevStep">← 上一步</button>
-          <button class="ob-btn ob-btn-primary" @click="nextStep">下一步 →</button>
+          <button class="ob-btn" @click="prevStep"><svg class="ob-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> 上一步</button>
+          <button class="ob-btn ob-btn-primary" @click="nextStep">下一步 <svg class="ob-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
         </div>
       </template>
 
@@ -586,6 +612,11 @@ const shortcuts = [
 }
 
 .ob-btn-full { width: 100%; }
+
+.ob-arrow-icon {
+  vertical-align: middle;
+  flex-shrink: 0;
+}
 
 .ob-btn-row {
   display: flex;
@@ -886,4 +917,21 @@ const shortcuts = [
 .ob-recommend-info { flex: 1; }
 .ob-recommend-name { font-size: 12px; color: var(--lc-text-primary); font-weight: 500; }
 .ob-recommend-hint { font-size: 10px; color: var(--lc-text-tertiary); margin-top: 2px; }
+
+.ob-reverify-btn {
+  margin-top: 8px;
+  padding: 4px 10px;
+  background: none;
+  border: 1px solid var(--lc-border);
+  border-radius: var(--lc-radius-sm, 4px);
+  color: var(--lc-text-tertiary);
+  font-size: 11px;
+  font-family: var(--lc-font-ui);
+  cursor: pointer;
+  transition: all 120ms;
+}
+.ob-reverify-btn:hover {
+  color: var(--lc-text-secondary);
+  border-color: var(--lc-text-tertiary);
+}
 </style>

@@ -72,6 +72,7 @@ export type ExtToWebMsg =
   | { type: 'clear_error' }
   | { type: 'show_code_review' }
   | { type: 'show_inline_edit' }
+  | { type: 'quote_code'; code: string; language: string }
   | { type: 'show_login' }
   | { type: 'recentFiles'; files: Array<{ name: string; path: string }> }
   | { type: 'code_review_start'; fileName?: string }
@@ -120,6 +121,7 @@ export type WebToExtMsg =
   | { type: 'feedback'; messageId?: string; rating: string; category: string }
   | { type: 'getRecentFiles' }
   | { type: 'attachFile'; name: string; content: string }
+  | { type: 'attachImage'; name: string; base64: string }
   | { type: 'startCodeReview' }
   | { type: 'inlineEditRequest'; instruction: string; code: string }
   | { type: 'inlineEditAccept'; code: string }

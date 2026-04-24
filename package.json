@@ -44,6 +44,14 @@
       {
         "command": "linkcode.toggleCompletion",
         "title": "LinkCode: Toggle Inline Completion"
+      },
+      {
+        "command": "linkcode.addToChat",
+        "title": "LinkCode: Add Selection to Chat"
+      },
+      {
+        "command": "linkcode.inlineEdit",
+        "title": "LinkCode: Inline Edit Selection"
       }
     ],
     "keybindings": [
@@ -56,6 +64,18 @@
         "command": "linkcode.acceptCompletion",
         "key": "tab",
         "when": "inlineSuggestionVisible"
+      },
+      {
+        "command": "linkcode.addToChat",
+        "key": "ctrl+shift+i",
+        "mac": "cmd+shift+i",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "linkcode.inlineEdit",
+        "key": "ctrl+shift+k",
+        "mac": "cmd+shift+k",
+        "when": "editorHasSelection"
       }
     ],
     "configuration": {

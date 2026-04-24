@@ -98,6 +98,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this._attachedFiles.push({ name: attachMsg.name, content: attachMsg.content })
           break
         }
+        case 'attachImage': {
+          const imgMsg = msg as { type: 'attachImage'; name: string; base64: string }
+          this._attachedFiles.push({
+            name: imgMsg.name,
+            content: `[图片: ${imgMsg.name}]`,
+          })
+          break
+        }
         case 'startCodeReview':
           this._handleCodeReview()
           break
@@ -186,6 +194,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.postMessage({ type: 'user_action', action, payload })
     const prompt = `[${action}]\n${payload}`
     this._handleSendMessage(prompt)
+  }
+
+  public quoteCodeToChat(code: string, language: string): void {
+    this.postMessage({ type: 'quote_code', code, language })
+  }
+
+  public sendInlineEditContext(code: string, _language: string, filepath: string): void {
+    this.postMessage({ type: 'show_inline_edit' })
+    this.postMessage({ type: 'inline_edit_context', code, fileName: filepath })
   }
 
   private _sendModelInfo(): void {

@@ -113,6 +113,37 @@ export function registerCommands(
       }
     )
   )
+
+  // Add selected code to Chat (quote)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('linkcode.addToChat', () => {
+      const editor = vscode.window.activeTextEditor
+      if (!editor || editor.selection.isEmpty) {
+        vscode.window.showWarningMessage('LinkCode: 请先选中代码')
+        return
+      }
+      const selectedText = editor.document.getText(editor.selection)
+      const language = editor.document.languageId
+      chatProvider.quoteCodeToChat(selectedText, language)
+      vscode.commands.executeCommand('linkcode.chatView.focus')
+    })
+  )
+
+  // Inline Edit — send selected code to WebView inline edit panel
+  context.subscriptions.push(
+    vscode.commands.registerCommand('linkcode.inlineEdit', () => {
+      const editor = vscode.window.activeTextEditor
+      if (!editor || editor.selection.isEmpty) {
+        vscode.window.showWarningMessage('LinkCode: 请先选中代码')
+        return
+      }
+      const selectedText = editor.document.getText(editor.selection)
+      const language = editor.document.languageId
+      const filepath = vscode.workspace.asRelativePath(editor.document.uri)
+      chatProvider.sendInlineEditContext(selectedText, language, filepath)
+      vscode.commands.executeCommand('linkcode.chatView.focus')
+    })
+  )
 }
 
 function getSelectedOrRangeText(

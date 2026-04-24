@@ -36,23 +36,39 @@ async function handleDrop(e: DragEvent) {
   isDragging.value = false
 
   const files = e.dataTransfer?.files
-  if (!files || files.length === 0) return
+  if (files && files.length > 0) {
+    for (const file of Array.from(files)) {
+      const attached: AttachedFile = {
+        name: file.name,
+        size: file.size,
+        status: 'loading',
+      }
+      emit('attach', attached)
 
-  for (const file of Array.from(files)) {
-    const attached: AttachedFile = {
-      name: file.name,
-      size: file.size,
-      status: 'loading',
+      try {
+        const content = await readFileContent(file)
+        attached.content = content
+        attached.status = 'done'
+        postMessage({ type: 'attachFile', name: file.name, content })
+      } catch {
+        attached.status = 'done'
+      }
     }
-    emit('attach', attached)
+    return
+  }
 
-    try {
-      const content = await readFileContent(file)
-      attached.content = content
-      attached.status = 'done'
-      postMessage({ type: 'attachFile', name: file.name, content })
-    } catch {
-      attached.status = 'done'
+  // VSCode file explorer drag: files come as URI text, not File objects
+  const uriText = e.dataTransfer?.getData('text/uri-list')
+    || e.dataTransfer?.getData('text/plain')
+    || e.dataTransfer?.getData('text')
+  if (uriText) {
+    const uris = uriText.split('\n').map(u => u.trim()).filter(Boolean)
+    for (const uri of uris) {
+      const filepath = decodeURIComponent(uri.replace(/^file:\/\/\/?/, ''))
+      const name = filepath.split(/[/\\]/).pop() || filepath
+      const attached: AttachedFile = { name, size: 0, status: 'loading' }
+      emit('attach', attached)
+      postMessage({ type: 'getFileContent', filepath })
     }
   }
 }
