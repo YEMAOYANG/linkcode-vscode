@@ -1,0 +1,75 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a0a30"/>
+      <stop offset="35%" stop-color="#0d0618"/>
+      <stop offset="65%" stop-color="#130a28"/>
+      <stop offset="100%" stop-color="#0a0412"/>
+    </linearGradient>
+    <radialGradient id="glowGrad" cx="50%" cy="45%" r="35%">
+      <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.14"/>
+      <stop offset="50%" stop-color="#7c3aed" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="iconGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="20" result="blur1"/>
+      <feGaussianBlur stdDeviation="40" result="blur2"/>
+      <feMerge>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="textGlow" x="-20%" y="-50%" width="140%" height="200%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <clipPath id="roundedRect">
+      <rect width="1024" height="1024" rx="48" ry="48"/>
+    </clipPath>
+    <pattern id="grid" x="0" y="0" width="64" height="64" patternUnits="userSpaceOnUse">
+      <path d="M 64 0 L 0 0 0 64" fill="none" stroke="rgba(124,58,237,0.04)" stroke-width="1"/>
+    </pattern>
+    <mask id="gridMask">
+      <radialGradient id="maskGrad" cx="50%" cy="50%" r="50%">
+        <stop offset="30%" stop-color="white" stop-opacity="1"/>
+        <stop offset="70%" stop-color="white" stop-opacity="0"/>
+      </radialGradient>
+      <rect width="1024" height="1024" fill="url(#maskGrad)"/>
+    </mask>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="48" fill="url(#bgGrad)"/>
+
+  <!-- Grid texture -->
+  <rect width="1024" height="1024" rx="48" fill="url(#grid)" mask="url(#gridMask)"/>
+
+  <!-- Radial glow -->
+  <rect width="1024" height="1024" rx="48" fill="url(#glowGrad)"/>
+
+  <!-- Sparkles icon, centered at ~460 vertical center (slightly above middle) -->
+  <g clip-path="url(#roundedRect)">
+    <g transform="translate(292, 232) scale(18.33)" filter="url(#iconGlow)">
+      <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"
+            fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M20 3v4" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M22 5h-4" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M4 17v2" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M5 18H3" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <!-- Brand name -->
+  <text x="512" y="872"
+        text-anchor="middle"
+        font-family="-apple-system, 'SF Pro Display', 'Inter', 'Segoe UI', sans-serif"
+        font-size="56"
+        font-weight="600"
+        letter-spacing="3.5"
+        fill="rgba(255,255,255,0.85)"
+        filter="url(#textGlow)">LinkCode</text>
+</svg>

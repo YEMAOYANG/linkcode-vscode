@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { Icon } from '@iconify/vue'
+import { Button } from '../ui'
 
 const props = defineProps<{
   level: 'warning' | 'critical'
@@ -39,8 +41,10 @@ function handleDismiss() {
     <span class="token-banner-icon">{{ config.icon }}</span>
     <span class="token-banner-text">{{ config.text }}</span>
     <div class="token-banner-actions">
-      <button class="token-banner-btn upgrade" @click="emit('upgrade')">升级</button>
-      <button class="token-banner-btn dismiss" @click="handleDismiss">×</button>
+      <Button size="sm" variant="primary" @click="emit('upgrade')">升级</Button>
+      <Button size="sm" variant="ghost" class="token-banner-dismiss" @click="handleDismiss">
+        <Icon icon="lucide:x" :width="12" :height="12" />
+      </Button>
     </div>
   </div>
 </template>
@@ -57,15 +61,15 @@ function handleDismiss() {
 }
 
 .token-warning {
-  background: rgba(245, 158, 11, 0.12);
-  border-bottom: 1px solid rgba(245, 158, 11, 0.25);
-  color: var(--lc-yellow);
+  background: color-mix(in srgb, var(--lcc-warning) 12%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--lcc-warning) 25%, transparent);
+  color: var(--lcc-warning);
 }
 
 .token-critical {
-  background: rgba(239, 68, 68, 0.12);
-  border-bottom: 1px solid rgba(239, 68, 68, 0.25);
-  color: var(--lc-red);
+  background: color-mix(in srgb, var(--lcc-danger) 12%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--lcc-danger) 25%, transparent);
+  color: var(--lcc-danger);
 }
 
 .token-banner-icon {
@@ -84,35 +88,7 @@ function handleDismiss() {
   flex-shrink: 0;
 }
 
-.token-banner-btn {
-  padding: 2px 8px;
-  border: none;
-  border-radius: var(--lc-radius-sm);
-  font-size: 10px;
-  cursor: pointer;
-  font-family: var(--lc-font-ui);
-  transition: all 120ms;
-}
-
-.token-banner-btn.upgrade {
-  background: var(--lc-accent);
-  color: #fff;
-}
-
-.token-banner-btn.upgrade:hover {
-  background: var(--lc-accent-hover);
-}
-
-.token-banner-btn.dismiss {
-  background: transparent;
-  color: inherit;
-  font-size: 14px;
-  padding: 0 4px;
-}
-
-.token-banner-btn.dismiss:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
+.token-banner-dismiss { padding: 4px; }
 
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-100%); }

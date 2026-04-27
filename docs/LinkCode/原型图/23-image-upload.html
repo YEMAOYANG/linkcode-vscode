@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode — 图片拖拽 / 粘贴上传</title>
+<style>
+/* === LinkCode Design Tokens === */
+:root {
+  --bg-app: #0f0f0f;
+  --bg-surface: #141414;
+  --bg-elevated: #1c1c1c;
+  --bg-hover: #232323;
+  --bg-active: #2a2a2a;
+  --bg-border: #2e2e2e;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-subtle: rgba(124,58,237,0.12);
+  --accent-text: #a78bfa;
+  --text-primary: #e2e2e2;
+  --text-secondary: #888888;
+  --text-tertiary: #555555;
+  --green: #22c55e;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --blue: #3b82f6;
+  --font-ui: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-code: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
+  --font-size: 13px;
+  --line-height: 1.5;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  font-family: var(--font-ui);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  color: var(--text-primary);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  width: 100%; height: 100%; overflow: hidden;
+}
+
+/* === VS Code Frame === */
+.vscode-frame {
+  width: 100%; height: 100vh; display: flex; flex-direction: column;
+  background: var(--bg-app); overflow: hidden;
+}
+.vscode-titlebar {
+  height: 36px; background: var(--bg-surface); display: flex; align-items: center;
+  padding: 0 12px; gap: 8px; flex-shrink: 0; border-bottom: 1px solid var(--bg-border);
+}
+.titlebar-dot { width: 12px; height: 12px; border-radius: 50%; }
+.titlebar-dot.close { background: #ff5f57; }
+.titlebar-dot.minimize { background: #ffbd2e; }
+.titlebar-dot.maximize { background: #28c840; }
+.titlebar-title { flex: 1; text-align: center; font-size: 12px; color: var(--text-tertiary); }
+
+.vscode-body { flex: 1; display: flex; overflow: hidden; }
+
+.vscode-sidebar {
+  width: 48px; background: var(--bg-surface); border-right: 1px solid var(--bg-border);
+  display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 4px; flex-shrink: 0;
+}
+.sidebar-icon {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  color: var(--text-tertiary); cursor: pointer; border-radius: var(--radius-sm);
+  transition: all var(--duration-fast) var(--ease);
+}
+.sidebar-icon:hover { color: var(--text-primary); background: var(--bg-hover); }
+.sidebar-icon.active { color: var(--accent-text); }
+
+.vscode-statusbar {
+  height: 24px; background: var(--bg-surface); border-top: 1px solid var(--bg-border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 10px;
+  font-size: 11px; flex-shrink: 0;
+}
+.statusbar-left, .statusbar-right { display: flex; align-items: center; gap: 12px; }
+.statusbar-item { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); }
+
+/* === Messages === */
+.message { padding: 12px 0; border-bottom: 1px solid var(--bg-border); }
+.message:last-child { border-bottom: none; }
+.msg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.msg-avatar { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+.msg-avatar.user { background: var(--bg-active); color: var(--text-secondary); }
+.msg-avatar.ai { background: var(--accent-subtle); color: var(--accent-text); }
+.msg-name { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+.msg-body { font-size: 13px; line-height: 1.7; color: var(--text-primary); padding-left: 30px; }
+.msg-body p { margin-bottom: 8px; color: var(--text-primary); }
+
+/* === Chat Input === */
+.chat-input-box {
+  display: flex; align-items: flex-end; gap: 8px; background: var(--bg-elevated);
+  border: 1px solid var(--bg-border); border-radius: var(--radius-lg); padding: 8px 12px;
+  transition: border-color var(--duration-fast) var(--ease);
+  position: relative;
+}
+.chat-input-box textarea {
+  flex: 1; border: none; background: transparent; color: var(--text-primary);
+  font-size: 13px; font-family: var(--font-ui); resize: none; outline: none;
+  min-height: 20px; max-height: 120px; line-height: 1.5;
+}
+.chat-input-box textarea::placeholder { color: var(--text-tertiary); }
+.send-btn {
+  width: 28px; height: 28px; border-radius: var(--radius-sm); background: var(--accent);
+  border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all var(--duration-fast) var(--ease); flex-shrink: 0;
+}
+.send-btn:hover { background: var(--accent-hover); }
+.input-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 6px 0 0; }
+.input-toolbar-left { display: flex; gap: 4px; }
+.input-toolbar-left button {
+  padding: 3px 8px; border: none; background: transparent; color: var(--text-tertiary);
+  font-size: 11px; cursor: pointer; border-radius: var(--radius-sm); transition: all var(--duration-fast);
+  display: flex; align-items: center; gap: 4px;
+}
+.input-toolbar-left button:hover { color: var(--text-secondary); background: var(--bg-hover); }
+.model-selector {
+  display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--accent-text);
+  padding: 3px 8px; border-radius: var(--radius-sm);
+}
+
+/* === Showcase Layout === */
+.showcase-container {
+  display: flex; flex-direction: column; gap: 48px;
+  padding: 32px 24px; overflow-y: auto; flex: 1;
+}
+.showcase-title {
+  font-size: 11px; font-weight: 600; color: var(--accent-text);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+}
+.showcase-title .num {
+  width: 20px; height: 20px; background: var(--accent-subtle);
+  border-radius: 4px; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: var(--accent); font-weight: 700;
+}
+.showcase-desc {
+  font-size: 11px; color: var(--text-tertiary); margin-bottom: 16px; line-height: 1.6;
+}
+
+/* === Demo Chat === */
+.demo-chat {
+  width: 380px; background: var(--bg-surface); border: 1px solid var(--bg-border);
+  border-radius: var(--radius-lg); overflow: hidden;
+}
+.demo-chat-header {
+  height: 36px; padding: 0 12px; display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid var(--bg-border);
+}
+.demo-chat-header i { color: var(--accent-text); }
+.demo-chat-header span { font-size: 12px; font-weight: 600; }
+.demo-chat-messages { padding: 12px; min-height: 60px; }
+.demo-chat-input { padding: 12px; border-top: 1px solid var(--bg-border); position: relative; }
+
+/* === Drag Overlay === */
+.drag-overlay {
+  position: absolute; inset: 0; background: rgba(124,58,237,0.08);
+  border: 2px dashed var(--accent); border-radius: var(--radius-lg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; z-index: 10;
+}
+.drag-overlay .drag-icon { color: var(--accent-text); }
+.drag-overlay .drag-text { font-size: 12px; color: var(--accent-text); font-weight: 500; }
+.drag-overlay .drag-sub { font-size: 10px; color: var(--text-tertiary); }
+
+/* === Image Preview === */
+.image-preview-container {
+  margin-bottom: 8px; position: relative; display: inline-block;
+}
+.image-preview-thumb {
+  width: 120px; height: 80px; border-radius: var(--radius-md);
+  object-fit: cover; border: 1px solid var(--bg-border);
+  cursor: pointer; transition: all 0.15s var(--ease);
+}
+.image-preview-thumb:hover { border-color: var(--accent); transform: scale(1.02); }
+.image-preview-remove {
+  position: absolute; top: -6px; right: -6px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--bg-active); border: 1px solid var(--bg-border);
+  color: var(--text-secondary); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all var(--duration-fast);
+}
+.image-preview-remove:hover { background: var(--red); color: #fff; border-color: var(--red); }
+
+/* === Image in Message Bubble === */
+.msg-image {
+  border-radius: var(--radius-md); max-width: 260px;
+  border: 1px solid var(--bg-border); margin-bottom: 8px;
+}
+.msg-image-grid {
+  display: flex; gap: 6px; margin-bottom: 8px;
+}
+.msg-image-grid img {
+  width: 120px; height: 80px; object-fit: cover;
+  border-radius: var(--radius-md); border: 1px solid var(--bg-border);
+}
+
+/* === Page Title === */
+.page-title {
+  padding: 24px 32px 0;
+  font-size: 16px; font-weight: 600; color: var(--text-primary);
+  display: flex; align-items: center; gap: 10px;
+}
+.page-title .tag {
+  font-size: 10px; padding: 2px 8px; border-radius: 4px;
+  background: var(--accent-subtle); color: var(--accent-text); font-weight: 500;
+}
+
+/* === Back Nav === */
+.back-to-index {
+  position: fixed; top: 12px; right: 12px; z-index: 9999;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; background: rgba(28,28,28,0.9);
+  border: 1px solid #2e2e2e; border-radius: 6px;
+  color: #a78bfa; font-size: 11px; font-weight: 500;
+  cursor: pointer; backdrop-filter: blur(8px);
+  transition: all 0.15s var(--ease);
+  text-decoration: none; opacity: 0.7;
+}
+.back-to-index:hover { opacity: 1; border-color: var(--accent); text-decoration: none; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+<div class="vscode-frame">
+  <div class="vscode-titlebar">
+    <div class="titlebar-dot close"></div><div class="titlebar-dot minimize"></div><div class="titlebar-dot maximize"></div>
+    <div class="titlebar-title">LinkCode — 图片拖拽 / 粘贴上传 · 4 种状态</div><div style="width:36px"></div>
+  </div>
+  <div class="vscode-body">
+    <div class="vscode-sidebar">
+      <div class="sidebar-icon"><i data-lucide="files" style="width:20px;height:20px"></i></div>
+      <div class="sidebar-icon"><i data-lucide="search" style="width:20px;height:20px"></i></div>
+      <div class="sidebar-icon"><i data-lucide="git-branch" style="width:20px;height:20px"></i></div>
+      <div class="sidebar-icon active"><i data-lucide="sparkles" style="width:20px;height:20px"></i></div>
+      <div style="flex:1"></div>
+      <div class="sidebar-icon"><i data-lucide="settings" style="width:20px;height:20px"></i></div>
+    </div>
+
+    <div class="showcase-container">
+      <div class="page-title">
+        🖼️ 图片拖拽 / 粘贴上传
+        <span class="tag">4 种状态</span>
+      </div>
+
+      <!-- State 1: Default -->
+      <div class="showcase-section">
+        <div class="showcase-title"><span class="num">1</span> 默认态 — 支持拖图 / Ctrl+V 粘贴</div>
+        <div class="showcase-desc">输入框支持拖拽图片和 Ctrl+V 粘贴图片，底部有图片图标按钮</div>
+        <div class="demo-chat">
+          <div class="demo-chat-header">
+            <i data-lucide="sparkles" style="width:14px;height:14px"></i>
+            <span>LinkCode</span>
+          </div>
+          <div class="demo-chat-messages">
+            <div class="message">
+              <div class="msg-header">
+                <div class="msg-avatar ai">✦</div>
+                <span class="msg-name" style="color:var(--accent-text)">LinkCode</span>
+              </div>
+              <div class="msg-body">
+                <p>你好！你可以将图片拖到输入框，或按 Ctrl+V 粘贴截图，我会帮你分析。</p>
+              </div>
+            </div>
+          </div>
+          <div class="demo-chat-input">
+            <div class="chat-input-box">
+              <textarea rows="1" placeholder="输入消息... 支持拖拽或粘贴图片" readonly></textarea>
+              <button class="send-btn"><i data-lucide="arrow-up" style="width:16px;height:16px"></i></button>
+            </div>
+            <div class="input-toolbar">
+              <div class="input-toolbar-left">
+                <button><i data-lucide="at-sign" style="width:12px;height:12px"></i> 引用</button>
+                <button><i data-lucide="paperclip" style="width:12px;height:12px"></i> 附件</button>
+                <button style="color:var(--accent-text);">
+                  <i data-lucide="image" style="width:12px;height:12px"></i> 图片
+                </button>
+              </div>
+              <div class="model-selector">
+                <span style="width:14px;height:14px;font-size:7px;font-weight:700;color:#fff;background:#4F46E5;border-radius:3px;display:inline-flex;align-items:center;justify-content:center">DS</span>
+                DeepSeek-V3
+              </div>
+            </div>
+            <!-- Hint -->
+            <div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding:6px 10px;background:var(--bg-elevated);border-radius:var(--radius-sm);border:1px solid var(--bg-border);">
+              <i data-lucide="info" style="width:12px;height:12px;color:var(--text-tertiary);flex-shrink:0"></i>
+              <span style="font-size:10px;color:var(--text-tertiary)">提示：拖拽图片到此区域，或使用 <kbd style="background:var(--bg-active);padding:1px 4px;border-radius:2px;font-size:9px;color:var(--text-secondary)">Ctrl+V</kbd> 粘贴截图</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- State 2: Drag Over -->
+      <div class="showcase-section">
+        <div class="showcase-title"><span class="num">2</span> 拖入悬停态 — 高亮边框</div>
+        <div class="showcase-desc">当图片拖入输入区域上方时，显示高亮虚线边框 + 「放开以上传图片」文字提示</div>
+        <div class="demo-chat">
+          <div class="demo-chat-header">
+            <i data-lucide="sparkles" style="width:14px;height:14px"></i>
+            <span>LinkCode</span>
+          </div>
+          <div class="demo-chat-messages">
+            <div class="message">
+              <div class="msg-header">
+                <div class="msg-avatar ai">✦</div>
+                <span class="msg-name" style="color:var(--accent-text)">LinkCode</span>
+              </div>
+              <div class="msg-body">
+                <p>你好！你可以将图片拖到输入框。</p>
+              </div>
+            </div>
+          </div>
+          <div class="demo-chat-input" style="position:relative;">
+            <div class="chat-input-box" style="border-color:var(--accent);min-height:90px;">
+              <div class="drag-overlay">
+                <i data-lucide="image-plus" style="width:28px;height:28px" class="drag-icon"></i>
+                <span class="drag-text">放开以上传图片</span>
+                <span class="drag-sub">支持 PNG / JPG / GIF / WebP · 最大 10MB</span>
+              </div>
+              <textarea rows="1" placeholder="" readonly style="opacity:0.2"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- State 3: Image Preview -->
+      <div class="showcase-section">
+        <div class="showcase-title"><span class="num">3</span> 图片预览态 — 缩略图 + 删除</div>
+        <div class="showcase-desc">图片上传后显示缩略图在输入框上方，支持点击放大和 X 删除</div>
+        <div class="demo-chat">
+          <div class="demo-chat-header">
+            <i data-lucide="sparkles" style="width:14px;height:14px"></i>
+            <span>LinkCode</span>
+          </div>
+          <div class="demo-chat-messages">
+            <div class="message">
+              <div class="msg-header">
+                <div class="msg-avatar ai">✦</div>
+                <span class="msg-name" style="color:var(--accent-text)">LinkCode</span>
+              </div>
+              <div class="msg-body">
+                <p>你好！你可以将图片拖到输入框。</p>
+              </div>
+            </div>
+          </div>
+          <div class="demo-chat-input">
+            <!-- Image previews -->
+            <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+              <div class="image-preview-container" style="animation:slideUp 0.3s var(--ease);">
+                <img src="https://picsum.photos/240/160?random=1" alt="截图预览" class="image-preview-thumb">
+                <button class="image-preview-remove"><i data-lucide="x" style="width:10px;height:10px"></i></button>
+              </div>
+              <div class="image-preview-container" style="animation:slideUp 0.3s var(--ease) 0.05s both;">
+                <img src="https://picsum.photos/240/160?random=2" alt="截图预览" class="image-preview-thumb">
+                <button class="image-preview-remove"><i data-lucide="x" style="width:10px;height:10px"></i></button>
+              </div>
+            </div>
+            <div class="chat-input-box" style="border-color:var(--accent);">
+              <textarea rows="1" readonly style="color:var(--text-primary);">这两张截图是我项目的 UI，帮我找出布局问题</textarea>
+              <button class="send-btn"><i data-lucide="arrow-up" style="width:16px;height:16px"></i></button>
+            </div>
+            <div class="input-toolbar">
+              <div class="input-toolbar-left">
+                <button><i data-lucide="at-sign" style="width:12px;height:12px"></i> 引用</button>
+                <button><i data-lucide="paperclip" style="width:12px;height:12px"></i> 附件</button>
+                <button style="color:var(--accent-text);"><i data-lucide="image" style="width:12px;height:12px"></i> 图片</button>
+              </div>
+              <div class="model-selector">
+                <span style="width:14px;height:14px;font-size:7px;font-weight:700;color:#fff;background:#4F46E5;border-radius:3px;display:inline-flex;align-items:center;justify-content:center">DS</span>
+                DeepSeek-V3
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- State 4: Image + Text Mixed Message -->
+      <div class="showcase-section" style="padding-bottom:48px;">
+        <div class="showcase-title"><span class="num">4</span> 图文混排消息 — 气泡内图片 + 文字</div>
+        <div class="showcase-desc">发送后的消息气泡内展示图片在上、文字在下的图文混排效果</div>
+        <div class="demo-chat">
+          <div class="demo-chat-header">
+            <i data-lucide="sparkles" style="width:14px;height:14px"></i>
+            <span>LinkCode</span>
+          </div>
+          <div class="demo-chat-messages">
+            <!-- User message with image -->
+            <div class="message">
+              <div class="msg-header">
+                <div class="msg-avatar user">U</div>
+                <span class="msg-name">你</span>
+              </div>
+              <div class="msg-body">
+                <div class="msg-image-grid">
+                  <img src="https://picsum.photos/240/160?random=3" alt="UI 截图 1">
+                  <img src="https://picsum.photos/240/160?random=4" alt="UI 截图 2">
+                </div>
+                <p style="margin:0;">这两张截图是我项目的 UI，帮我找出布局问题</p>
+              </div>
+            </div>
+            <!-- AI response -->
+            <div class="message">
+              <div class="msg-header">
+                <div class="msg-avatar ai">✦</div>
+                <span class="msg-name" style="color:var(--accent-text)">LinkCode</span>
+                <span style="font-size:10px;color:var(--text-tertiary)">
+                  <span style="width:14px;height:14px;font-size:7px;font-weight:700;color:#fff;background:#4F46E5;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-right:3px">DS</span>
+                  DeepSeek-V3 · 892 tokens
+                </span>
+              </div>
+              <div class="msg-body">
+                <p>我分析了你的两张 UI 截图，发现以下布局问题：</p>
+                <div style="background:var(--bg-elevated);border:1px solid var(--bg-border);border-radius:var(--radius-md);padding:10px 14px;margin:8px 0;">
+                  <div style="font-size:12px;margin-bottom:6px;">
+                    <span style="color:var(--red);font-weight:600;">❶ 间距不一致</span>
+                  </div>
+                  <p style="font-size:12px;color:var(--text-secondary);margin:0;">截图 1 中导航栏和主体内容的间距是 24px，但截图 2 中变成了 16px。建议统一使用 24px。</p>
+                </div>
+                <div style="background:var(--bg-elevated);border:1px solid var(--bg-border);border-radius:var(--radius-md);padding:10px 14px;margin:8px 0;">
+                  <div style="font-size:12px;margin-bottom:6px;">
+                    <span style="color:var(--yellow);font-weight:600;">❷ 卡片圆角混乱</span>
+                  </div>
+                  <p style="font-size:12px;color:var(--text-secondary);margin:0;">截图 2 中部分卡片使用 8px 圆角，另一些是 12px。建议用 8px 统一。</p>
+                </div>
+                <div style="background:var(--bg-elevated);border:1px solid var(--bg-border);border-radius:var(--radius-md);padding:10px 14px;margin:8px 0;">
+                  <div style="font-size:12px;margin-bottom:6px;">
+                    <span style="color:var(--green);font-weight:600;">❸ 建议优化</span>
+                  </div>
+                  <p style="font-size:12px;color:var(--text-secondary);margin:0;">两张截图的颜色对比度整体良好，侧边栏层级清晰 👍</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="demo-chat-input">
+            <div class="chat-input-box">
+              <textarea rows="1" placeholder="继续提问..." readonly></textarea>
+              <button class="send-btn"><i data-lucide="arrow-up" style="width:16px;height:16px"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /showcase-container -->
+  </div><!-- /vscode-body -->
+  <div class="vscode-statusbar">
+    <div class="statusbar-left">
+      <span class="statusbar-item"><i data-lucide="git-branch" style="width:12px;height:12px"></i> main</span>
+      <span class="statusbar-item">TypeScript</span>
+    </div>
+    <div class="statusbar-right">
+      <span class="statusbar-item" style="color:var(--green)">⚡ ¥38.48 余额</span>
+    </div>
+  </div>
+</div>
+
+<a href="index.html" class="back-to-index">
+  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+  导航页
+</a>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+});
+</script>
+</body>
+</html>

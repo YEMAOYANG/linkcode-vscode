@@ -126,10 +126,10 @@ defineExpose({ handlePaste, handleDrop, openFilePicker })
   position: relative;
   width: 52px;
   height: 52px;
-  border-radius: var(--lc-radius-md);
+  border-radius: var(--lcc-radius-md);
   overflow: hidden;
-  border: 1px solid var(--lc-border);
-  animation: fadeIn 0.15s ease;
+  border: 1px solid var(--lcc-border);
+  animation: lc-fade-in 0.15s ease;
 }
 
 .preview-thumb {
@@ -164,10 +164,10 @@ defineExpose({ handlePaste, handleDrop, openFilePicker })
 .add-image-btn {
   width: 52px;
   height: 52px;
-  border-radius: var(--lc-radius-md);
-  border: 1px dashed var(--lc-border);
+  border-radius: var(--lcc-radius-md);
+  border: 1px dashed var(--lcc-border);
   background: transparent;
-  color: var(--lc-text-tertiary);
+  color: var(--lcc-text-subtle);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -176,12 +176,7 @@ defineExpose({ handlePaste, handleDrop, openFilePicker })
 }
 
 .add-image-btn:hover {
-  border-color: var(--lc-accent);
-  color: var(--lc-accent-text);
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  border-color: var(--lcc-accent);
+  color: var(--lcc-accent);
 }
 </style>

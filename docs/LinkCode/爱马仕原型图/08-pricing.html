@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode - 定价页</title>
+<link rel="stylesheet" href="shared-styles.css">
+<style>
+body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.pricing-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 48px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: radial-gradient(ellipse at 50% 0%, rgba(124,92,252,0.06) 0%, transparent 60%);
+}
+.pricing-header {
+  text-align: center;
+  margin-bottom: 36px;
+}
+.pricing-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 8px;
+}
+.pricing-header p {
+  font-size: 15px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.pricing-header .highlight {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 600;
+}
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  max-width: 960px;
+  width: 100%;
+  margin-bottom: 36px;
+}
+.price-card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, border-color 0.2s;
+}
+.price-card:hover { transform: translateY(-4px); }
+.price-card.featured {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, rgba(124,92,252,0.08) 0%, var(--bg-tertiary) 40%);
+  position: relative;
+}
+.price-card.featured::before {
+  content: '🔥 最受欢迎';
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent-gradient);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 14px;
+  border-radius: 10px;
+}
+.price-card .plan-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 4px;
+}
+.price-card .plan-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+.price-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.price-amount .currency { font-size: 18px; color: var(--text-secondary); font-weight: 500; }
+.price-amount .amount { font-size: 42px; font-weight: 800; color: var(--text-bright); line-height: 1; }
+.price-amount .period { font-size: 14px; color: var(--text-muted); }
+.price-note { font-size: 11px; color: var(--text-muted); margin-bottom: 20px; }
+.price-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  margin-bottom: 20px;
+  transition: all 0.15s;
+}
+.price-btn-primary { background: var(--accent-gradient); color: white; }
+.price-btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+.price-btn-secondary { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); }
+.price-btn-secondary:hover { border-color: var(--border-light); }
+.feature-list { list-style: none; flex: 1; }
+.feature-list li {
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.feature-list li .check { color: var(--green); font-size: 14px; }
+.feature-list li .cross { color: var(--text-muted); font-size: 14px; }
+.feature-list li.disabled { opacity: 0.4; }
+.compare-section {
+  max-width: 960px;
+  width: 100%;
+}
+.compare-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 16px;
+  text-align: center;
+}
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.compare-table th {
+  padding: 10px 16px;
+  text-align: left;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+}
+.compare-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: var(--text-primary);
+}
+.compare-table tr:hover td { background: var(--bg-hover); }
+.compare-table .product-name { font-weight: 600; }
+.vs-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.vs-win { background: rgba(78,201,176,0.12); color: var(--green); }
+.vs-lose { background: rgba(241,76,76,0.08); color: var(--text-muted); }
+.guarantee {
+  text-align: center;
+  margin-top: 28px;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  max-width: 600px;
+}
+.guarantee p { font-size: 13px; color: var(--text-secondary); }
+.guarantee strong { color: var(--text-bright); }
+</style>
+</head>
+<body>
+<div class="macos-window">
+  <div class="titlebar">
+    <div class="traffic-lights"><span class="tl-close"></span><span class="tl-minimize"></span><span class="tl-maximize"></span></div>
+    <div class="titlebar-text">LinkCode — 选择方案</div>
+  </div>
+  <div class="vscode-layout">
+    <div class="activity-bar">
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7v10l4-3V10L3 7zm0 0l9-4 9 4M12 3v18m0 0l9-4V7"/></svg></div>
+      <div class="activity-icon active">
+        <svg viewBox="0 0 24 24" fill="none"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#5ea2ef"/></linearGradient></defs><path d="M12 2L2 7l10 5 10-5-10-5z" fill="url(#lg)" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="url(#lg)" stroke-width="1.5" fill="none"/></svg>
+      </div>
+      <div class="activity-spacer"></div>
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4"/></svg></div>
+    </div>
+    <div class="editor-area">
+      <div class="tab-bar">
+        <div class="tab active">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="#7c3aed" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="#7c3aed" stroke-width="1.5" fill="none"/></svg>
+          选择方案
+          <span class="tab-close">×</span>
+        </div>
+      </div>
+      <div class="pricing-content">
+        <div class="pricing-header">
+          <h1>选择适合你的方案</h1>
+          <p>比 Cursor 便宜 <span class="highlight">73%</span>，61+ 个模型任你选，<span class="highlight">国产模型数据不出境</span></p>
+        </div>
+
+        <div class="pricing-grid">
+          <!-- Free -->
+          <div class="price-card">
+            <div class="plan-name">Free</div>
+            <div class="plan-desc">个人探索，零成本起步</div>
+            <div class="price-amount">
+              <span class="currency">¥</span>
+              <span class="amount">0</span>
+              <span class="period">/月</span>
+            </div>
+            <div class="price-note">永久免费</div>
+            <button class="price-btn price-btn-secondary">当前方案</button>
+            <ul class="feature-list">
+              <li><span class="check">✓</span> 每日 50 次代码补全</li>
+              <li><span class="check">✓</span> 每日 10 次 AI 对话</li>
+              <li><span class="check">✓</span> 国产模型（DeepSeek/Qwen）</li>
+              <li><span class="check">✓</span> 基础代码补全</li>
+              <li class="disabled"><span class="cross">✗</span> 自动路由</li>
+              <li class="disabled"><span class="cross">✗</span> Inline Edit</li>
+              <li class="disabled"><span class="cross">✗</span> AI 代码审查</li>
+              <li class="disabled"><span class="cross">✗</span> 国际模型</li>
+            </ul>
+          </div>
+          <!-- Pro -->
+          <div class="price-card featured">
+            <div class="plan-name">Pro</div>
+            <div class="plan-desc">专业开发者的首选</div>
+            <div class="price-amount">
+              <span class="currency">¥</span>
+              <span class="amount">39</span>
+              <span class="period">/月</span>
+            </div>
+            <div class="price-note">年付 ¥29/月，节省 26% · 比 Cursor ¥145/月 便宜 73%</div>
+            <button class="price-btn price-btn-primary">🚀 升级到 Pro</button>
+            <ul class="feature-list">
+              <li><span class="check">✓</span> <strong>无限</strong>代码补全</li>
+              <li><span class="check">✓</span> <strong>无限</strong> AI 对话</li>
+              <li><span class="check">✓</span> 全部 <strong>61+</strong> 模型</li>
+              <li><span class="check">✓</span> ⚡ 智能自动路由</li>
+              <li><span class="check">✓</span> ✏️ Inline Edit（⌘K）</li>
+              <li><span class="check">✓</span> 🔍 AI 代码审查</li>
+              <li><span class="check">✓</span> 国际模型（GPT-4o/Claude）</li>
+              <li><span class="check">✓</span> 优先技术支持</li>
+            </ul>
+          </div>
+          <!-- Team -->
+          <div class="price-card">
+            <div class="plan-name">Team</div>
+            <div class="plan-desc">团队协作，规模优惠</div>
+            <div class="price-amount">
+              <span class="currency">¥</span>
+              <span class="amount">29</span>
+              <span class="period">/人/月</span>
+            </div>
+            <div class="price-note">≥5 人起，年付更优惠</div>
+            <button class="price-btn price-btn-secondary">联系销售</button>
+            <ul class="feature-list">
+              <li><span class="check">✓</span> Pro 全部功能</li>
+              <li><span class="check">✓</span> 👥 团队知识库</li>
+              <li><span class="check">✓</span> 📊 团队成本仪表板</li>
+              <li><span class="check">✓</span> 🔐 SSO 单点登录</li>
+              <li><span class="check">✓</span> 用量配额管理</li>
+              <li><span class="check">✓</span> 专属客户经理</li>
+              <li><span class="check">✓</span> SLA 保障</li>
+              <li><span class="check">✓</span> 私有化部署可选</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Comparison -->
+        <div class="compare-section">
+          <h3>📊 vs Cursor 对比</h3>
+          <table class="compare-table">
+            <thead>
+              <tr><th>特性</th><th class="product-name">LinkCode Pro</th><th>Cursor Pro</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>月费</td><td><span class="vs-badge vs-win">¥39/月</span></td><td>¥145/月（$20）</td></tr>
+              <tr><td>模型数量</td><td><span class="vs-badge vs-win">61+ 个</span></td><td>~10 个</td></tr>
+              <tr><td>国产模型</td><td><span class="vs-badge vs-win">DeepSeek/Qwen/豆包</span></td><td><span class="vs-badge vs-lose">无</span></td></tr>
+              <tr><td>数据合规</td><td><span class="vs-badge vs-win">数据不出境</span></td><td><span class="vs-badge vs-lose">数据出境</span></td></tr>
+              <tr><td>网络要求</td><td><span class="vs-badge vs-win">无需翻墙</span></td><td>需要翻墙</td></tr>
+              <tr><td>智能路由</td><td><span class="vs-badge vs-win">自动节省 40%+</span></td><td><span class="vs-badge vs-lose">无</span></td></tr>
+              <tr><td>中文体验</td><td><span class="vs-badge vs-win">原生中文</span></td><td>英文为主</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="guarantee">
+          <p>🛡️ <strong>7 天无理由退款</strong> · 不满意随时取消，无需任何理由</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div class="status-accent"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.5" fill="none"/></svg> LinkCode</div>
+    <div class="status-bar-left"><div class="status-item">Free 方案</div></div>
+    <div class="status-bar-right"><div class="status-item">升级享受完整体验 →</div></div>
+  </div>
+</div>
+<script>
+// Pricing card hover lift effect
+document.querySelectorAll('.pricing-card, [class*="plan-card"]').forEach(card => {
+  card.style.transition = 'all 0.3s ease';
+  card.addEventListener('mouseenter', () => {
+    card.style.transform = 'translateY(-6px)';
+    card.style.boxShadow = '0 12px 40px rgba(124,58,237,0.15)';
+  });
+  card.addEventListener('mouseleave', () => {
+    card.style.transform = '';
+    card.style.boxShadow = '';
+  });
+});
+
+// Feature table row highlight
+document.querySelectorAll('tr, .feature-row').forEach(row => {
+  row.style.transition = 'background 0.15s';
+  row.addEventListener('mouseenter', () => {
+    row.style.background = 'rgba(124,58,237,0.05)';
+  });
+  row.addEventListener('mouseleave', () => {
+    row.style.background = '';
+  });
+});
+
+// CTA button click
+document.querySelectorAll('.btn-primary, .btn-lg').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const orig = btn.textContent;
+    btn.textContent = '🎉 正在跳转...';
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+  });
+});
+
+// Cards stagger animation
+document.querySelectorAll('.pricing-card, [class*="plan-card"]').forEach((card, i) => {
+  card.style.opacity = '0';
+  card.style.transform = 'translateY(20px)';
+  setTimeout(() => {
+    card.style.transition = 'all 0.5s ease';
+    card.style.opacity = '1';
+    card.style.transform = 'translateY(0)';
+  }, 200 + i * 150);
+});
+</script>
+</body>
+</html>

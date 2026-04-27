@@ -1,3 +1,4 @@
+import * as path from 'node:path'
 import * as vscode from 'vscode'
 import type { ChatViewProvider } from '../providers/ChatViewProvider'
 import type { SecretStore } from '../utils/secretStorage'
@@ -114,7 +115,7 @@ export function registerCommands(
     )
   )
 
-  // Add selected code to Chat (quote)
+  // Add selected code to Chat (quote) — Cursor-style chip reference
   context.subscriptions.push(
     vscode.commands.registerCommand('linkcode.addToChat', () => {
       const editor = vscode.window.activeTextEditor
@@ -122,9 +123,17 @@ export function registerCommands(
         vscode.window.showWarningMessage('LinkCode: 请先选中代码')
         return
       }
-      const selectedText = editor.document.getText(editor.selection)
+      const selection = editor.selection
+      const selectedText = editor.document.getText(selection)
       const language = editor.document.languageId
-      chatProvider.quoteCodeToChat(selectedText, language)
+      const filepath = editor.document.uri.fsPath
+      const filename = path.basename(filepath)
+      chatProvider.quoteCodeToChat(selectedText, language, {
+        filename,
+        filepath,
+        lineStart: selection.start.line + 1,
+        lineEnd: selection.end.line + 1,
+      })
       vscode.commands.executeCommand('linkcode.chatView.focus')
     })
   )

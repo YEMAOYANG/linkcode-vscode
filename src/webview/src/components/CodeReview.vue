@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useVSCode } from '../composables/useVSCode'
 import { useMarkdown } from '../composables/useMarkdown'
+import { Button, Dialog } from '../ui'
 
-const emit = defineEmits<{
-  close: []
-}>()
+const emit = defineEmits<{ close: [] }>()
 
 const { postMessage, onMessage } = useVSCode()
 const { renderMarkdown } = useMarkdown()
+
+const dialogOpen = ref(true)
+watch(dialogOpen, (v) => { if (!v) emit('close') })
 
 const isLoading = ref(false)
 const reviewResult = ref('')
@@ -16,14 +18,10 @@ const renderedHtml = ref('')
 const fileName = ref('')
 let cleanup: (() => void) | undefined
 
-interface ReviewIssue {
-  level: 'error' | 'warning' | 'info'
-  text: string
-}
+interface ReviewIssue { level: 'error' | 'warning' | 'info'; text: string }
 
 const issues = computed<ReviewIssue[]>(() => {
   if (!reviewResult.value) return []
-  // Parse review result for severity markers
   const lines = reviewResult.value.split('\n')
   const result: ReviewIssue[] = []
   for (const line of lines) {
@@ -67,9 +65,7 @@ onMounted(() => {
   })
 })
 
-onUnmounted(() => {
-  cleanup?.()
-})
+onUnmounted(() => { cleanup?.() })
 
 function handleStartReview() {
   postMessage({ type: 'startCodeReview' })
@@ -77,215 +73,94 @@ function handleStartReview() {
 </script>
 
 <template>
-  <div class="cr-overlay" @click.self="emit('close')">
-    <div class="cr-panel">
-      <div class="cr-header">
-        <h2 class="cr-title">🔍 代码审查</h2>
-        <button class="cr-close" @click="emit('close')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+  <Dialog v-model:open="dialogOpen" title="🔍 代码审查" size="md">
+    <div v-if="!reviewResult && !isLoading" class="cr-empty">
+      <p>点击下方按钮，AI 将审查当前活动文件的代码质量。</p>
+      <Button variant="primary" @click="handleStartReview">开始审查</Button>
+    </div>
+
+    <div v-else-if="isLoading && !reviewResult" class="cr-loading">
+      <div class="cr-spinner" />
+      <span>正在审查 {{ fileName }}...</span>
+    </div>
+
+    <div v-else class="cr-results">
+      <div class="cr-file-name">📄 {{ fileName }}</div>
+      <div v-if="issues.length > 0" class="cr-summary">
+        <span v-if="errorCount" class="cr-badge cr-badge-error">{{ errorCount }} Error</span>
+        <span v-if="warningCount" class="cr-badge cr-badge-warning">{{ warningCount }} Warning</span>
+        <span v-if="infoCount" class="cr-badge cr-badge-info">{{ infoCount }} Info</span>
       </div>
-
-      <!-- No review yet -->
-      <div v-if="!reviewResult && !isLoading" class="cr-empty">
-        <p>点击下方按钮，AI 将审查当前活动文件的代码质量。</p>
-        <button class="cr-start-btn" @click="handleStartReview">
-          开始审查
-        </button>
-      </div>
-
-      <!-- Loading -->
-      <div v-else-if="isLoading && !reviewResult" class="cr-loading">
-        <div class="cr-spinner" />
-        <span>正在审查 {{ fileName }}...</span>
-      </div>
-
-      <!-- Results -->
-      <div v-else class="cr-results">
-        <div class="cr-file-name">📄 {{ fileName }}</div>
-
-        <!-- Summary badges -->
-        <div v-if="issues.length > 0" class="cr-summary">
-          <span v-if="errorCount" class="cr-badge cr-badge-error">{{ errorCount }} Error</span>
-          <span v-if="warningCount" class="cr-badge cr-badge-warning">{{ warningCount }} Warning</span>
-          <span v-if="infoCount" class="cr-badge cr-badge-info">{{ infoCount }} Info</span>
-        </div>
-
-        <div class="cr-body markdown-body" v-html="renderedHtml" />
-
-        <div v-if="isLoading" class="cr-streaming">
-          <div class="cr-spinner-sm" />
-          <span>审查中...</span>
-        </div>
+      <div class="cr-body markdown-body" v-html="renderedHtml" />
+      <div v-if="isLoading" class="cr-streaming">
+        <div class="cr-spinner-sm" />
+        <span>审查中...</span>
       </div>
     </div>
-  </div>
+  </Dialog>
 </template>
 
 <style scoped>
-.cr-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 150;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: fadeIn 0.15s ease;
-}
-
-.cr-panel {
-  width: 100%;
-  max-width: 480px;
-  max-height: 85vh;
-  overflow-y: auto;
-  background: var(--lc-surface, var(--color-bg));
-  border: 1px solid var(--lc-border);
-  border-radius: var(--lc-radius-lg);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
-  padding: 20px;
-  animation: slideUp 0.2s var(--lc-ease);
-}
-
-.cr-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.cr-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--lc-text-primary);
-}
-
-.cr-close {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: var(--lc-radius-sm);
-  color: var(--lc-text-secondary);
-  cursor: pointer;
-  transition: all 120ms;
-}
-
-.cr-close:hover {
-  background: var(--lc-hover);
-  color: var(--lc-text-primary);
-}
-
 .cr-empty {
   text-align: center;
   padding: 24px 0;
-  color: var(--lc-text-tertiary);
+  color: var(--lcc-text-subtle);
   font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
-
-.cr-start-btn {
-  margin-top: 12px;
-  padding: 8px 20px;
-  background: var(--lc-accent);
-  border: none;
-  border-radius: var(--lc-radius-md);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: var(--lc-font-ui);
-  transition: background 120ms;
-}
-
-.cr-start-btn:hover {
-  background: var(--lc-accent-hover);
-}
-
 .cr-loading {
   display: flex;
   align-items: center;
   gap: 10px;
   justify-content: center;
   padding: 24px;
-  color: var(--lc-text-tertiary);
+  color: var(--lcc-text-subtle);
   font-size: 12px;
 }
-
 .cr-spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--lc-border);
-  border-top-color: var(--lc-accent);
+  width: 18px; height: 18px;
+  border: 2px solid var(--lcc-border);
+  border-top-color: var(--lcc-accent);
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: lc-spin 0.8s linear infinite;
 }
-
 .cr-spinner-sm {
-  width: 12px;
-  height: 12px;
-  border: 1.5px solid var(--lc-border);
-  border-top-color: var(--lc-accent);
+  width: 12px; height: 12px;
+  border: 1.5px solid var(--lcc-border);
+  border-top-color: var(--lcc-accent);
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: lc-spin 0.8s linear infinite;
 }
-
-.cr-file-name {
-  font-size: 12px;
-  color: var(--lc-text-secondary);
-  margin-bottom: 8px;
-}
-
-.cr-summary {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
+.cr-file-name { font-size: 12px; color: var(--lcc-text-muted); margin-bottom: 8px; }
+.cr-summary { display: flex; gap: 6px; margin-bottom: 12px; }
 .cr-badge {
   padding: 2px 8px;
-  border-radius: var(--lc-radius-sm);
+  border-radius: var(--lcc-radius-sm);
   font-size: 10px;
   font-weight: 600;
 }
-
-.cr-badge-error { background: rgba(239, 68, 68, 0.12); color: var(--lc-red); }
-.cr-badge-warning { background: rgba(245, 158, 11, 0.12); color: var(--lc-yellow); }
-.cr-badge-info { background: rgba(59, 130, 246, 0.12); color: var(--lc-blue); }
-
-.cr-results {
-  animation: fadeIn 0.2s ease;
+.cr-badge-error {
+  background: color-mix(in srgb, var(--lcc-danger) 14%, transparent);
+  color: var(--lcc-danger);
 }
-
-.cr-body {
-  font-size: 12px;
-  line-height: 1.7;
+.cr-badge-warning {
+  background: color-mix(in srgb, var(--lcc-warning) 14%, transparent);
+  color: var(--lcc-warning);
 }
-
+.cr-badge-info {
+  background: color-mix(in srgb, var(--lcc-info) 14%, transparent);
+  color: var(--lcc-info);
+}
+.cr-body { font-size: 12px; line-height: 1.7; }
 .cr-streaming {
   display: flex;
   align-items: center;
   gap: 6px;
   padding-top: 8px;
   font-size: 11px;
-  color: var(--lc-text-tertiary);
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  color: var(--lcc-text-subtle);
 }
 </style>

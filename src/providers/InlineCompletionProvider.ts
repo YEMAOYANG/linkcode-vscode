@@ -2,6 +2,7 @@ import * as vscode from 'vscode'
 import type { ApiClient } from '../api/client'
 import { extractContext } from '../utils/context'
 import { CompletionCache } from '../completion/cache'
+import { ContextCollector } from '../completion/ContextCollector'
 import { CONFIG_SECTION, DEBOUNCE_MS } from '../shared/constants'
 import { Logger } from '../utils/logger'
 
@@ -12,6 +13,7 @@ export class InlineCompletionProvider
   private debounceTimer: ReturnType<typeof setTimeout> | undefined
   private readonly cache = new CompletionCache()
   private readonly apiClient: ApiClient
+  private readonly context = new ContextCollector()
 
   constructor(apiClient: ApiClient) {
     this.apiClient = apiClient
@@ -76,6 +78,11 @@ export class InlineCompletionProvider
     // Extract context using shared utility
     const ctx = extractContext(document, position)
 
+    // Phase 5E: enrich with cross-file context
+    const neighbourFiles = this.context.collectNeighbours(document)
+    const openTabs = this.context.collectOpenTabs(document.uri)
+    const diagnostics = this.context.collectDiagnostics(document.uri)
+
     // Wire cancellation token to abort controller
     const cancelDisposable = token.onCancellationRequested(() => this.abortController?.abort())
 
@@ -86,6 +93,9 @@ export class InlineCompletionProvider
           suffix: ctx.suffix,
           language: ctx.language,
           filepath: ctx.filepath,
+          neighbourFiles,
+          openTabs,
+          diagnostics,
         },
         this.abortController.signal
       )
@@ -112,4 +122,9 @@ export class InlineCompletionProvider
       cancelDisposable.dispose()
     }
   }
+
+  // NOTE: `handleDidPartiallyAcceptCompletionItem` is still a proposed VS Code API
+  // (`inlineCompletionsAdditions`). Implementing it in a stable extension triggers
+  // "Extension CANNOT use API proposal" at activation. Partial acceptance via
+  // Ctrl+→ / Ctrl+Shift+→ still works natively — we just skip the telemetry hook.
 }

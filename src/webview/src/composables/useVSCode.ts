@@ -21,6 +21,13 @@ function getApi(): VSCodeApi {
 }
 
 /**
+ * Singleton accessor for non-Vue contexts (e.g. event delegation in main.ts).
+ */
+export function getVsCodeApi(): VSCodeApi {
+  return getApi()
+}
+
+/**
  * WebToExtMsg-compatible message shape.
  * We use Record<string, unknown> with a required `type` field
  * to keep the webview decoupled from the extension's exact type definitions

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { Button } from '../ui'
 
 export type ErrorType = 'network' | 'apiKey' | 'modelError'
 
@@ -52,7 +53,6 @@ function handleAction() {
 <template>
   <div class="error-state">
     <div class="error-icon-wrap">
-      <!-- wifi-off -->
       <svg v-if="errorConfig.icon === 'wifi-off'" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <line x1="1" y1="1" x2="23" y2="23" />
         <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
@@ -62,11 +62,9 @@ function handleAction() {
         <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
         <line x1="12" y1="20" x2="12.01" y2="20" />
       </svg>
-      <!-- key -->
       <svg v-else-if="errorConfig.icon === 'key'" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
       </svg>
-      <!-- alert -->
       <svg v-else width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
         <line x1="12" y1="9" x2="12" y2="13" />
@@ -75,9 +73,9 @@ function handleAction() {
     </div>
     <div class="error-title">{{ errorConfig.title }}</div>
     <div class="error-desc">{{ errorConfig.desc }}</div>
-    <button class="error-action" @click="handleAction">
+    <Button variant="primary" size="sm" @click="handleAction">
       {{ errorConfig.action }}
-    </button>
+    </Button>
   </div>
 </template>
 
@@ -89,53 +87,30 @@ function handleAction() {
   gap: 12px;
   padding: 24px 16px;
   text-align: center;
-  animation: fadeIn 0.2s ease;
+  animation: lc-slide-up 0.2s ease;
 }
 
 .error-icon-wrap {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: rgba(239, 68, 68, 0.12);
+  background: color-mix(in srgb, var(--lcc-danger) 12%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--lc-red);
+  color: var(--lcc-danger);
 }
 
 .error-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--lc-text-primary);
+  color: var(--lcc-text);
 }
 
 .error-desc {
   font-size: 12px;
-  color: var(--lc-text-tertiary);
+  color: var(--lcc-text-subtle);
   max-width: 280px;
   line-height: 1.5;
-}
-
-.error-action {
-  margin-top: 4px;
-  padding: 6px 16px;
-  background: var(--lc-accent);
-  border: none;
-  border-radius: var(--lc-radius-md);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: var(--lc-font-ui);
-  transition: background 120ms;
-}
-
-.error-action:hover {
-  background: var(--lc-accent-hover);
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 </style>

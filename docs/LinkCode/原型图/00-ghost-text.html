@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode — Ghost Text 编辑器内补全</title>
+<style>
+/* === LinkCode Design Tokens — Linear-inspired === */
+:root {
+  --bg-app: #0f0f0f;
+  --bg-surface: #141414;
+  --bg-elevated: #1c1c1c;
+  --bg-hover: #232323;
+  --bg-active: #2a2a2a;
+  --bg-border: #2e2e2e;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-subtle: rgba(124,58,237,0.12);
+  --accent-text: #a78bfa;
+  --text-primary: #e2e2e2;
+  --text-secondary: #888888;
+  --text-tertiary: #555555;
+  --green: #22c55e;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --blue: #3b82f6;
+  --font-ui: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-code: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
+  --font-size: 13px;
+  --line-height: 1.5;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  font-family: var(--font-ui); font-size: var(--font-size); line-height: var(--line-height);
+  color: var(--text-primary); background: var(--bg-app); width: 100%; height: 100%; overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+/* === VS Code Frame === */
+.vscode-frame { width: 100%; height: 100vh; display: flex; flex-direction: column; background: var(--bg-app); overflow: hidden; }
+.vscode-titlebar {
+  height: 36px; background: var(--bg-surface); display: flex; align-items: center;
+  padding: 0 12px; gap: 8px; flex-shrink: 0; border-bottom: 1px solid var(--bg-border);
+}
+.titlebar-dot { width: 12px; height: 12px; border-radius: 50%; }
+.titlebar-dot.close { background: #ff5f57; }
+.titlebar-dot.minimize { background: #ffbd2e; }
+.titlebar-dot.maximize { background: #28c840; }
+.titlebar-title { flex: 1; text-align: center; font-size: 12px; color: var(--text-tertiary); }
+
+.vscode-body { flex: 1; display: flex; overflow: hidden; }
+
+/* Sidebar */
+.vscode-sidebar {
+  width: 48px; background: var(--bg-surface); border-right: 1px solid var(--bg-border);
+  display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 4px; flex-shrink: 0;
+}
+.sidebar-icon {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  color: var(--text-tertiary); cursor: pointer; border-radius: var(--radius-sm);
+  transition: all var(--duration-fast) var(--ease);
+}
+.sidebar-icon:hover { color: var(--text-primary); background: var(--bg-hover); }
+.sidebar-icon.active { color: var(--accent-text); }
+
+/* Explorer Panel */
+.explorer-panel {
+  width: 240px; background: var(--bg-surface); border-right: 1px solid var(--bg-border);
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+.explorer-header {
+  height: 35px; padding: 0 12px; display: flex; align-items: center;
+  font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--bg-border);
+}
+.explorer-tree { flex: 1; overflow-y: auto; padding: 4px 0; }
+.tree-item {
+  display: flex; align-items: center; gap: 6px; padding: 3px 12px 3px 16px;
+  font-size: 12px; color: var(--text-secondary); cursor: pointer;
+  transition: background var(--duration-fast);
+}
+.tree-item:hover { background: var(--bg-hover); }
+.tree-item.active { background: var(--accent-subtle); color: var(--accent-text); }
+.tree-item.folder { color: var(--text-tertiary); font-weight: 500; }
+.tree-indent { width: 16px; flex-shrink: 0; }
+.tree-icon { width: 16px; height: 16px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.tree-icon.ts { color: #3178c6; }
+.tree-icon.json { color: #f59e0b; }
+.tree-icon.md { color: #60a5fa; }
+.tree-icon.folder-icon { color: var(--text-tertiary); }
+
+/* Editor Area */
+.editor-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.editor-tabs {
+  display: flex; align-items: center; height: 35px; background: var(--bg-surface);
+  border-bottom: 1px solid var(--bg-border); overflow-x: auto; flex-shrink: 0;
+}
+.editor-tab {
+  display: flex; align-items: center; gap: 6px; padding: 0 16px; height: 100%;
+  font-size: 12px; color: var(--text-secondary); cursor: pointer; border-right: 1px solid var(--bg-border);
+  white-space: nowrap; transition: all var(--duration-fast) var(--ease);
+}
+.editor-tab:hover { background: var(--bg-hover); }
+.editor-tab.active { color: var(--text-primary); background: var(--bg-app); border-bottom: 2px solid var(--accent); }
+.tab-dot { width: 8px; height: 8px; border-radius: 50%; }
+.tab-dot.ts { background: #3178c6; }
+.tab-dot.json { background: #f59e0b; }
+
+/* Code Editor */
+.code-editor { flex: 1; display: flex; overflow: hidden; position: relative; }
+.line-numbers {
+  width: 48px; background: var(--bg-app); padding: 12px 8px 12px 0;
+  text-align: right; font-family: var(--font-code); font-size: 12px; line-height: 1.7;
+  color: var(--text-tertiary); flex-shrink: 0; user-select: none;
+}
+.line-numbers .ln.active { color: var(--text-primary); }
+.code-content {
+  flex: 1; padding: 12px 16px; overflow: auto;
+  font-family: var(--font-code); font-size: 12px; line-height: 1.7;
+}
+
+/* Syntax Colors */
+.kw { color: #c586c0; } /* keyword */
+.fn { color: #dcdcaa; } /* function */
+.tp { color: #4ec9b0; } /* type */
+.str { color: #ce9178; } /* string */
+.num { color: #b5cea8; } /* number */
+.cm { color: #6a9955; } /* comment */
+.op { color: #d4d4d4; } /* operator */
+.pr { color: #9cdcfe; } /* property/variable */
+.pc { color: #569cd6; } /* punctuation-keyword */
+
+/* Ghost Text — the core feature */
+.ghost-text {
+  color: rgba(136, 136, 136, 0.5);
+  background: rgba(124, 58, 237, 0.04);
+  border-left: 1px solid rgba(124, 58, 237, 0.2);
+  padding-left: 2px;
+  font-style: italic;
+  position: relative;
+}
+.ghost-text::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  opacity: 0.4;
+  animation: ghostPulse 2s ease-in-out infinite;
+}
+
+@keyframes ghostPulse {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.6; }
+}
+
+/* Cursor */
+.cursor {
+  display: inline-block;
+  width: 2px;
+  height: 15px;
+  background: var(--text-primary);
+  vertical-align: text-bottom;
+  animation: cursorBlink 1s step-end infinite;
+}
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Breadcrumb */
+.breadcrumb {
+  height: 22px; display: flex; align-items: center; gap: 4px; padding: 0 12px;
+  font-size: 11px; color: var(--text-tertiary); border-bottom: 1px solid var(--bg-border);
+  background: var(--bg-app); flex-shrink: 0;
+}
+.breadcrumb span { cursor: pointer; }
+.breadcrumb span:hover { color: var(--text-secondary); }
+.breadcrumb .sep { color: var(--text-tertiary); margin: 0 2px; }
+
+/* Status Bar */
+.vscode-statusbar {
+  height: 24px; background: var(--bg-surface); border-top: 1px solid var(--bg-border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 10px;
+  font-size: 11px; flex-shrink: 0;
+}
+.statusbar-left, .statusbar-right { display: flex; align-items: center; gap: 12px; }
+.statusbar-item { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); cursor: pointer; }
+.statusbar-item:hover { color: var(--text-primary); }
+.statusbar-item.accent { color: var(--accent-text); }
+.statusbar-sep { width: 1px; height: 14px; background: var(--bg-border); }
+
+/* Shortcut Hints Bar */
+.shortcut-bar {
+  height: 32px; background: var(--bg-surface); border-top: 1px solid var(--bg-border);
+  display: flex; align-items: center; justify-content: center; gap: 24px; flex-shrink: 0;
+}
+.shortcut-hint {
+  display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-tertiary);
+}
+.shortcut-hint kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 18px; padding: 0 4px;
+  background: var(--bg-elevated); border: 1px solid var(--bg-border); border-radius: 3px;
+  font-family: var(--font-ui); font-size: 10px; color: var(--text-secondary);
+  box-shadow: 0 1px 0 var(--bg-border);
+}
+.shortcut-hint .action-accept { color: var(--green); }
+.shortcut-hint .action-reject { color: var(--red); }
+.shortcut-hint .action-next { color: var(--accent-text); }
+
+/* Route Decision Panel */
+.route-panel {
+  position: fixed; top: 48px; right: 60px; z-index: 100;
+  width: 280px; background: var(--bg-elevated); border: 1px solid var(--bg-border);
+  border-radius: var(--radius-lg); padding: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  animation: slideIn 0.3s var(--ease);
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.route-panel-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+}
+.route-panel-title { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+.route-panel-badge {
+  font-size: 10px; padding: 2px 6px; border-radius: 3px;
+  background: rgba(34,197,94,0.12); color: var(--green);
+}
+.route-item {
+  display: flex; align-items: flex-start; gap: 8px; padding: 6px 0;
+  border-bottom: 1px solid var(--bg-border);
+}
+.route-item:last-child { border-bottom: none; }
+.route-label { font-size: 11px; color: var(--text-tertiary); min-width: 56px; flex-shrink: 0; }
+.route-value { font-size: 11px; color: var(--text-primary); }
+.route-value .model-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 6px; background: var(--accent-subtle); color: var(--accent-text);
+  border-radius: 3px; font-weight: 500;
+}
+.route-value .reason { color: var(--text-secondary); font-size: 10px; margin-top: 2px; }
+
+/* Minimap */
+.minimap {
+  width: 60px; background: var(--bg-app); border-left: 1px solid var(--bg-border);
+  flex-shrink: 0; position: relative; overflow: hidden; opacity: 0.5;
+}
+.minimap-line {
+  height: 3px; margin: 1px 8px; background: var(--bg-active); border-radius: 1px;
+}
+.minimap-line.short { width: 20px; }
+.minimap-line.medium { width: 32px; }
+.minimap-line.long { width: 44px; }
+.minimap-line.ghost { background: rgba(124,58,237,0.2); }
+.minimap-viewport {
+  position: absolute; top: 40px; left: 0; right: 0; height: 80px;
+  border: 1px solid rgba(124,58,237,0.2); background: rgba(124,58,237,0.05);
+}
+
+/* Back to Index */
+.back-to-index {
+  position: fixed; top: 42px; right: 12px; z-index: 9999;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; background: rgba(28,28,28,0.9);
+  border: 1px solid #2e2e2e; border-radius: 6px;
+  color: #a78bfa; font-size: 11px; font-weight: 500;
+  cursor: pointer; backdrop-filter: blur(8px);
+  transition: all 0.15s var(--ease); text-decoration: none;
+  font-family: var(--font-ui); opacity: 0.7;
+}
+.back-to-index:hover { opacity: 1; background: rgba(44,44,44,0.95); border-color: #7c3aed; text-decoration: none; }
+</style>
+</head>
+<body>
+<a href="index.html" class="back-to-index">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+  导航页
+</a>
+
+<div class="vscode-frame">
+  <!-- Title Bar -->
+  <div class="vscode-titlebar">
+    <div class="titlebar-dot close"></div><div class="titlebar-dot minimize"></div><div class="titlebar-dot maximize"></div>
+    <div class="titlebar-title">userService.ts — my-app — LinkCode</div>
+    <div style="width:36px"></div>
+  </div>
+
+  <div class="vscode-body">
+    <!-- Sidebar Icons -->
+    <div class="vscode-sidebar">
+      <div class="sidebar-icon active">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+      </div>
+      <div class="sidebar-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </div>
+      <div class="sidebar-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 01-9 9"/></svg>
+      </div>
+      <div class="sidebar-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <div style="flex:1"></div>
+      <div class="sidebar-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </div>
+    </div>
+
+    <!-- Explorer Panel -->
+    <div class="explorer-panel">
+      <div class="explorer-header">Explorer</div>
+      <div class="explorer-tree">
+        <div class="tree-item folder"><span class="tree-icon folder-icon">▾</span> src</div>
+        <div class="tree-item" style="padding-left:28px"><span class="tree-icon ts">TS</span> index.ts</div>
+        <div class="tree-item" style="padding-left:28px"><span class="tree-icon ts">TS</span> app.ts</div>
+        <div class="tree-item folder" style="padding-left:28px"><span class="tree-icon folder-icon">▾</span> services</div>
+        <div class="tree-item active" style="padding-left:44px"><span class="tree-icon ts">TS</span> userService.ts</div>
+        <div class="tree-item" style="padding-left:44px"><span class="tree-icon ts">TS</span> authService.ts</div>
+        <div class="tree-item" style="padding-left:44px"><span class="tree-icon ts">TS</span> apiClient.ts</div>
+        <div class="tree-item folder" style="padding-left:28px"><span class="tree-icon folder-icon">▾</span> models</div>
+        <div class="tree-item" style="padding-left:44px"><span class="tree-icon ts">TS</span> user.ts</div>
+        <div class="tree-item" style="padding-left:44px"><span class="tree-icon ts">TS</span> types.ts</div>
+        <div class="tree-item folder" style="padding-left:28px"><span class="tree-icon folder-icon">▸</span> utils</div>
+        <div class="tree-item folder" style="padding-left:28px"><span class="tree-icon folder-icon">▸</span> tests</div>
+        <div class="tree-item"><span class="tree-icon json">{ }</span> package.json</div>
+        <div class="tree-item"><span class="tree-icon json">{ }</span> tsconfig.json</div>
+        <div class="tree-item"><span class="tree-icon md">#</span> README.md</div>
+      </div>
+    </div>
+
+    <!-- Editor -->
+    <div class="editor-area">
+      <div class="editor-tabs">
+        <div class="editor-tab"><span class="tab-dot ts"></span> index.ts</div>
+        <div class="editor-tab active"><span class="tab-dot ts"></span> userService.ts</div>
+        <div class="editor-tab"><span class="tab-dot ts"></span> authService.ts</div>
+      </div>
+      <div class="breadcrumb">
+        <span>src</span><span class="sep">›</span>
+        <span>services</span><span class="sep">›</span>
+        <span style="color:var(--text-primary)">userService.ts</span><span class="sep">›</span>
+        <span style="color:var(--accent-text)">getUserById</span>
+      </div>
+
+      <div style="flex:1; display:flex; overflow:hidden;">
+        <div class="code-editor">
+          <div class="line-numbers">
+            <div class="ln">1</div><div class="ln">2</div><div class="ln">3</div><div class="ln">4</div>
+            <div class="ln">5</div><div class="ln">6</div><div class="ln">7</div><div class="ln">8</div>
+            <div class="ln">9</div><div class="ln">10</div><div class="ln">11</div><div class="ln">12</div>
+            <div class="ln">13</div><div class="ln">14</div><div class="ln active">15</div><div class="ln">16</div>
+            <div class="ln">17</div><div class="ln">18</div><div class="ln">19</div><div class="ln">20</div>
+            <div class="ln">21</div><div class="ln">22</div><div class="ln">23</div><div class="ln">24</div>
+            <div class="ln">25</div><div class="ln">26</div><div class="ln">27</div><div class="ln">28</div>
+            <div class="ln">29</div><div class="ln">30</div><div class="ln">31</div><div class="ln">32</div>
+            <div class="ln">33</div><div class="ln">34</div><div class="ln">35</div>
+          </div>
+          <div class="code-content">
+<pre style="margin:0; line-height:1.7;">
+<span class="kw">import</span> { <span class="tp">User</span>, <span class="tp">UserRole</span>, <span class="tp">UserPreferences</span> } <span class="kw">from</span> <span class="str">'../models/user'</span>;
+<span class="kw">import</span> { <span class="fn">apiClient</span> } <span class="kw">from</span> <span class="str">'./apiClient'</span>;
+<span class="kw">import</span> { <span class="fn">cache</span> } <span class="kw">from</span> <span class="str">'../utils/cache'</span>;
+
+<span class="cm">/** 用户服务 - 处理用户 CRUD 操作 */</span>
+<span class="kw">export class</span> <span class="tp">UserService</span> {
+  <span class="kw">private</span> <span class="pr">baseUrl</span> = <span class="str">'/api/v1/users'</span>;
+
+  <span class="cm">/** 根据 ID 获取用户信息 */</span>
+  <span class="kw">async</span> <span class="fn">getUserById</span>(<span class="pr">id</span>: <span class="tp">string</span>): <span class="tp">Promise</span>&lt;<span class="tp">User</span> | <span class="pc">null</span>&gt; {
+    <span class="kw">const</span> <span class="pr">cached</span> = <span class="fn">cache</span>.<span class="fn">get</span>&lt;<span class="tp">User</span>&gt;(<span class="str">`user:</span><span class="str">${</span><span class="pr">id</span><span class="str">}`</span>);
+    <span class="kw">if</span> (<span class="pr">cached</span>) <span class="kw">return</span> <span class="pr">cached</span>;
+
+    <span class="kw">const</span> <span class="pr">response</span> = <span class="kw">await</span> <span class="fn">apiClient</span>.<span class="fn">get</span>&lt;<span class="tp">User</span>&gt;(<span class="str">`${</span><span class="kw">this</span>.<span class="pr">baseUrl</span><span class="str">}/${</span><span class="pr">id</span><span class="str">}`</span>);
+    <span class="cursor"></span><span class="ghost-text">cache.set(`user:${id}`, response.data, { ttl: 300 });</span>
+    <span class="ghost-text">    return response.data;</span>
+    <span class="ghost-text">  }</span>
+
+    <span class="kw">return</span> <span class="pr">response</span>.<span class="pr">data</span>;
+  }
+
+  <span class="cm">/** 更新用户偏好设置 */</span>
+  <span class="kw">async</span> <span class="fn">updatePreferences</span>(
+    <span class="pr">userId</span>: <span class="tp">string</span>,
+    <span class="pr">prefs</span>: <span class="tp">Partial</span>&lt;<span class="tp">UserPreferences</span>&gt;
+  ): <span class="tp">Promise</span>&lt;<span class="tp">UserPreferences</span>&gt; {
+    <span class="kw">const</span> <span class="pr">response</span> = <span class="kw">await</span> <span class="fn">apiClient</span>.<span class="fn">patch</span>&lt;<span class="tp">UserPreferences</span>&gt;(
+      <span class="str">`${</span><span class="kw">this</span>.<span class="pr">baseUrl</span><span class="str">}/${</span><span class="pr">userId</span><span class="str">}/preferences`</span>,
+      <span class="pr">prefs</span>
+    );
+    <span class="fn">cache</span>.<span class="fn">invalidate</span>(<span class="str">`user:${</span><span class="pr">userId</span><span class="str">}`</span>);
+    <span class="kw">return</span> <span class="pr">response</span>.<span class="pr">data</span>;
+  }
+
+  <span class="cm">/** 获取用户列表 */</span>
+  <span class="kw">async</span> <span class="fn">listUsers</span>(<span class="pr">page</span> = <span class="num">1</span>, <span class="pr">limit</span> = <span class="num">20</span>): <span class="tp">Promise</span>&lt;<span class="tp">User</span>[]&gt; {
+    <span class="kw">const</span> <span class="pr">res</span> = <span class="kw">await</span> <span class="fn">apiClient</span>.<span class="fn">get</span>(<span class="str">`${</span><span class="kw">this</span>.<span class="pr">baseUrl</span><span class="str">}?page=${</span><span class="pr">page</span><span class="str">}&amp;limit=${</span><span class="pr">limit</span><span class="str">}`</span>);
+    <span class="kw">return</span> <span class="pr">res</span>.<span class="pr">data</span>;
+  }
+}
+</pre>
+          </div>
+        </div>
+
+        <!-- Minimap -->
+        <div class="minimap">
+          <div class="minimap-viewport"></div>
+          <div style="padding-top:8px;">
+            <div class="minimap-line long"></div>
+            <div class="minimap-line medium"></div>
+            <div class="minimap-line short"></div>
+            <div class="minimap-line"></div>
+            <div class="minimap-line long"></div>
+            <div class="minimap-line medium"></div>
+            <div class="minimap-line short"></div>
+            <div class="minimap-line long"></div>
+            <div class="minimap-line medium"></div>
+            <div class="minimap-line short"></div>
+            <div class="minimap-line long"></div>
+            <div class="minimap-line medium"></div>
+            <div class="minimap-line ghost"></div>
+            <div class="minimap-line ghost"></div>
+            <div class="minimap-line ghost"></div>
+            <div class="minimap-line medium"></div>
+            <div class="minimap-line long"></div>
+            <div class="minimap-line medium"></div>
+            <div class="minimap-line short"></div>
+            <div class="minimap-line long"></div>
+            <div class="minimap-line medium"></div>
+            <div class="minimap-line long"></div>
+            <div class="minimap-line short"></div>
+            <div class="minimap-line medium"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Shortcut Hints Bar -->
+      <div class="shortcut-bar">
+        <div class="shortcut-hint">
+          <kbd>Tab</kbd>
+          <span class="action-accept">接受补全</span>
+        </div>
+        <div class="shortcut-hint">
+          <kbd>Esc</kbd>
+          <span class="action-reject">拒绝</span>
+        </div>
+        <div class="shortcut-hint">
+          <kbd>Alt</kbd> + <kbd>[</kbd>
+          <span class="action-next">下一个建议</span>
+        </div>
+        <div class="shortcut-hint">
+          <kbd>Alt</kbd> + <kbd>]</kbd>
+          <span>上一个建议</span>
+        </div>
+        <div class="shortcut-hint">
+          <span style="color:var(--accent-text)">⚡ 建议 1/3</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Route Decision Panel -->
+  <div class="route-panel">
+    <div class="route-panel-header">
+      <div class="route-panel-title">🧠 路由决策</div>
+      <div class="route-panel-badge">已优化</div>
+    </div>
+    <div class="route-item">
+      <div class="route-label">选用模型</div>
+      <div class="route-value">
+        <span class="model-tag">DeepSeek-V3</span>
+      </div>
+    </div>
+    <div class="route-item">
+      <div class="route-label">路由原因</div>
+      <div class="route-value">
+        <div class="reason">TypeScript 代码补全 → 中等复杂度</div>
+        <div class="reason">缓存逻辑模式匹配 → 高置信度</div>
+      </div>
+    </div>
+    <div class="route-item">
+      <div class="route-label">响应时间</div>
+      <div class="route-value" style="color:var(--green);">87ms</div>
+    </div>
+    <div class="route-item">
+      <div class="route-label">Token 消耗</div>
+      <div class="route-value">补全: 42 tokens · ¥0.0003</div>
+    </div>
+    <div class="route-item">
+      <div class="route-label">对比节省</div>
+      <div class="route-value" style="color:var(--green);">vs GPT-4o 节省 92%</div>
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="vscode-statusbar">
+    <div class="statusbar-left">
+      <div class="statusbar-item" style="color:var(--accent-text);">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        LinkCode
+      </div>
+      <div class="statusbar-sep"></div>
+      <div class="statusbar-item">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 01-9 9"/></svg>
+        main
+      </div>
+      <div class="statusbar-item">Ln 15, Col 45</div>
+    </div>
+    <div class="statusbar-right">
+      <div class="statusbar-item accent">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        DeepSeek-V3
+      </div>
+      <div class="statusbar-sep"></div>
+      <div class="statusbar-item" style="color:var(--green);">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+        Token 余额: ¥12.50
+      </div>
+      <div class="statusbar-sep"></div>
+      <div class="statusbar-item">TypeScript</div>
+      <div class="statusbar-item">UTF-8</div>
+      <div class="statusbar-item">Spaces: 2</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -52,6 +52,26 @@
       {
         "command": "linkcode.inlineEdit",
         "title": "LinkCode: Inline Edit Selection"
+      },
+      {
+        "command": "linkcode.acceptHunk",
+        "title": "LinkCode: Accept Hunk",
+        "category": "LinkCode"
+      },
+      {
+        "command": "linkcode.rejectHunk",
+        "title": "LinkCode: Reject Hunk",
+        "category": "LinkCode"
+      },
+      {
+        "command": "linkcode.acceptAllHunks",
+        "title": "LinkCode: Accept All Changes",
+        "category": "LinkCode"
+      },
+      {
+        "command": "linkcode.rejectAllHunks",
+        "title": "LinkCode: Reject All Changes",
+        "category": "LinkCode"
       }
     ],
     "keybindings": [
@@ -67,6 +87,12 @@
       },
       {
         "command": "linkcode.addToChat",
+        "key": "ctrl+shift+l",
+        "mac": "cmd+shift+l",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "linkcode.addToChat",
         "key": "ctrl+shift+i",
         "mac": "cmd+shift+i",
         "when": "editorHasSelection"
@@ -76,6 +102,17 @@
         "key": "ctrl+shift+k",
         "mac": "cmd+shift+k",
         "when": "editorHasSelection"
+      },
+      {
+        "command": "linkcode.acceptAllHunks",
+        "key": "ctrl+shift+enter",
+        "mac": "cmd+shift+enter",
+        "when": "linkcode.hasActiveDiff && editorFocus"
+      },
+      {
+        "command": "linkcode.rejectAllHunks",
+        "key": "escape",
+        "when": "linkcode.hasActiveDiff && editorFocus && !suggestWidgetVisible && !parameterHintsVisible && !inlineSuggestionVisible"
       }
     ],
     "configuration": {
@@ -182,6 +219,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@types/diff": "^8.0.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
@@ -194,5 +232,8 @@
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.59.0"
   },
-  "icon": "assets/icon.svg"
+  "icon": "assets/icon.svg",
+  "dependencies": {
+    "diff": "^9.0.0"
+  }
 }

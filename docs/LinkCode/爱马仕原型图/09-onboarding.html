@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode - 新手引导</title>
+<link rel="stylesheet" href="shared-styles.css">
+<style>
+body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.onboarding-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background: radial-gradient(ellipse at 50% 30%, rgba(124,58,237,0.08) 0%, transparent 60%);
+  position: relative;
+  overflow: hidden;
+}
+.step-container {
+  width: 100%;
+  max-width: 680px;
+  animation: fadeIn 0.4s ease;
+}
+.step { display: none; }
+.step.active { display: block; animation: fadeIn 0.4s ease; }
+
+/* Step indicator */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 36px;
+}
+.step-dot {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--bg-input);
+  border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600;
+  color: var(--text-muted);
+  transition: all 0.3s;
+  cursor: pointer;
+}
+.step-dot.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+.step-dot.done {
+  background: var(--green);
+  border-color: var(--green);
+  color: white;
+}
+.step-line {
+  width: 60px; height: 2px;
+  background: var(--border);
+  transition: background 0.3s;
+}
+.step-line.done { background: var(--green); }
+
+/* Welcome step */
+.welcome-hero { text-align: center; margin-bottom: 32px; }
+.welcome-hero svg { width: 72px; height: 72px; filter: drop-shadow(0 4px 24px rgba(124,58,237,0.4)); margin-bottom: 16px; }
+.welcome-hero h1 {
+  font-size: 28px; font-weight: 700;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+}
+.welcome-hero p { color: var(--text-secondary); font-size: 15px; line-height: 1.6; }
+
+.login-options { display: flex; flex-direction: column; gap: 10px; max-width: 380px; margin: 0 auto; }
+.login-btn {
+  padding: 12px 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 12px;
+  transition: all 0.15s;
+}
+.login-btn:hover { border-color: var(--accent); background: var(--bg-selected); transform: translateY(-1px); }
+.login-btn:active { transform: translateY(0); }
+.login-btn .icon { font-size: 20px; width: 24px; text-align: center; }
+.login-divider { text-align: center; color: var(--text-muted); font-size: 12px; margin: 8px 0; position: relative; }
+.login-divider::before, .login-divider::after {
+  content: ''; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--border);
+}
+.login-divider::before { left: 0; }
+.login-divider::after { right: 0; }
+
+.api-key-section { max-width: 380px; margin: 0 auto; }
+.api-key-section label { font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; display: block; }
+.api-key-row { display: flex; gap: 8px; }
+
+/* Model config step */
+.config-cards { display: flex; gap: 14px; margin-bottom: 24px; }
+.config-card {
+  flex: 1;
+  background: var(--bg-tertiary);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+.config-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.config-card.selected { border-color: var(--accent); background: rgba(124,58,237,0.08); }
+.config-card.selected::after {
+  content: '✓'; position: absolute; top: 12px; right: 12px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent); color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+}
+.config-card .emoji { font-size: 28px; margin-bottom: 10px; }
+.config-card h3 { font-size: 15px; color: var(--text-bright); margin-bottom: 4px; }
+.config-card p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+.config-card .price { font-size: 13px; color: var(--accent-light); margin-top: 8px; font-weight: 600; }
+.config-card.recommended { border-color: var(--accent); }
+.recommend-badge {
+  position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+  background: var(--accent-gradient); color: white;
+  padding: 2px 10px; border-radius: 10px;
+  font-size: 10px; font-weight: 600;
+}
+
+/* Ghost text demo step */
+.demo-editor {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.demo-tab-bar {
+  height: 32px; background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 12px; font-size: 12px; color: var(--text-secondary);
+}
+.demo-code {
+  padding: 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  line-height: 22px;
+}
+.ghost-demo { color: var(--ghost); }
+.ghost-demo.typing { overflow: hidden; white-space: nowrap; border-right: 2px solid var(--accent); animation: ghostType 2s steps(40) forwards, blink 0.7s step-end infinite; }
+@keyframes ghostType { from { width: 0; } to { width: 100%; } }
+.demo-hint {
+  text-align: center; font-size: 13px; color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.demo-hint kbd {
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 3px; padding: 2px 8px; font-size: 11px; color: var(--text-bright);
+  font-family: 'Inter', sans-serif;
+}
+
+/* Cheat sheet step */
+.cheatsheet { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+.shortcut-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  animation: fadeIn 0.3s ease both;
+}
+.shortcut-item .label { font-size: 13px; color: var(--text-primary); }
+.shortcut-item kbd {
+  background: var(--bg-input); border: 1px solid var(--border-light);
+  border-radius: 4px; padding: 3px 8px; font-size: 12px; color: var(--accent-light);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.step-nav { display: flex; justify-content: space-between; margin-top: 24px; }
+
+/* Progress bar */
+.onboarding-progress {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 3px; background: var(--bg-input);
+}
+.onboarding-progress-fill {
+  height: 100%; background: var(--accent-gradient);
+  transition: width 0.4s ease;
+}
+</style>
+</head>
+<body>
+<div class="macos-window">
+  <div class="titlebar">
+    <div class="traffic-lights"><span class="tl-close"></span><span class="tl-minimize"></span><span class="tl-maximize"></span></div>
+    <div class="titlebar-text">欢迎使用 LinkCode</div>
+  </div>
+  <div class="vscode-layout">
+    <div class="activity-bar">
+      <div class="activity-icon active" title="LinkCode AI">
+        <svg viewBox="0 0 24 24" fill="none"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#5ea2ef"/></linearGradient></defs><path d="M12 2L2 7l10 5 10-5-10-5z" fill="url(#lg)" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="url(#lg)" stroke-width="1.5" fill="none"/></svg>
+      </div>
+      <div class="activity-spacer"></div>
+    </div>
+    <div class="onboarding-content">
+      <!-- Step Indicator -->
+      <div class="step-indicator">
+        <div class="step-dot active" data-step="1">1</div>
+        <div class="step-line"></div>
+        <div class="step-dot" data-step="2">2</div>
+        <div class="step-line"></div>
+        <div class="step-dot" data-step="3">3</div>
+        <div class="step-line"></div>
+        <div class="step-dot" data-step="4">4</div>
+      </div>
+
+      <div class="step-container">
+        <!-- Step 1: Welcome + Login -->
+        <div class="step active" id="step1">
+          <div class="welcome-hero">
+            <svg viewBox="0 0 24 24" fill="none"><defs><linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#5ea2ef"/></linearGradient></defs><path d="M12 2L2 7l10 5 10-5-10-5z" fill="url(#lg2)" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="url(#lg2)" stroke-width="1.5" fill="none"/></svg>
+            <h1>欢迎使用 LinkCode</h1>
+            <p>AI 多模型编程助手，聚合 61+ 个模型<br>免费额度立即可用，无需信用卡</p>
+          </div>
+          <div class="login-options">
+            <button class="login-btn" onclick="goStep(2)"><span class="icon">📧</span> 使用邮箱登录 / 注册</button>
+            <button class="login-btn" onclick="goStep(2)"><span class="icon">🐙</span> 使用 GitHub 登录</button>
+            <button class="login-btn" onclick="goStep(2)"><span class="icon">💬</span> 使用微信登录</button>
+            <div class="login-divider">或</div>
+            <div class="api-key-section">
+              <label>Smoothlink API Key</label>
+              <div class="api-key-row">
+                <input class="input" type="password" placeholder="sk-xxxxxxxxxxxxxxxx" id="apiKeyInput">
+                <button class="btn btn-primary" onclick="validateKey()">验证</button>
+              </div>
+              <div id="keyStatus" style="font-size:12px;margin-top:6px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Model Config -->
+        <div class="step" id="step2">
+          <div style="text-align:center;margin-bottom:24px;">
+            <h2 style="font-size:22px;color:var(--text-bright);margin-bottom:6px;">选择你的模型配置</h2>
+            <p style="color:var(--text-secondary);font-size:14px;">选择一种推荐方案，之后可随时调整</p>
+          </div>
+          <div class="config-cards">
+            <div class="config-card" onclick="selectConfig(this)">
+              <div class="emoji">💰</div>
+              <h3>省钱模式</h3>
+              <p>补全：Qwen-Coder-7B<br>对话：DeepSeek-V3<br>审查：Qwen-72B</p>
+              <div class="price">≈ ¥0.5/天</div>
+            </div>
+            <div class="config-card selected recommended" onclick="selectConfig(this)">
+              <div class="recommend-badge">⭐ 推荐</div>
+              <div class="emoji">⚡</div>
+              <h3>均衡模式</h3>
+              <p>补全：DeepSeek-V3<br>对话：Claude Sonnet<br>审查：GPT-4o</p>
+              <div class="price">≈ ¥3/天</div>
+            </div>
+            <div class="config-card" onclick="selectConfig(this)">
+              <div class="emoji">🚀</div>
+              <h3>高性能模式</h3>
+              <p>补全：Claude Sonnet<br>对话：GPT-4o<br>审查：Claude Opus</p>
+              <div class="price">≈ ¥8/天</div>
+            </div>
+          </div>
+          <div style="text-align:center;">
+            <button class="btn btn-ghost btn-sm" onclick="goStep(3)" style="margin-top:8px;">使用智能路由（自动选择最优模型）→</button>
+          </div>
+          <div class="step-nav">
+            <button class="btn btn-ghost" onclick="goStep(1)">← 返回</button>
+            <button class="btn btn-primary" onclick="goStep(3)">下一步 →</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Ghost Text Demo -->
+        <div class="step" id="step3">
+          <div style="text-align:center;margin-bottom:24px;">
+            <h2 style="font-size:22px;color:var(--text-bright);margin-bottom:6px;">体验 AI 代码补全</h2>
+            <p style="color:var(--text-secondary);font-size:14px;">输入代码时，AI 会自动给出补全建议</p>
+          </div>
+          <div class="demo-editor">
+            <div class="demo-tab-bar">📄 demo.ts</div>
+            <div class="demo-code">
+              <div><span class="kw">function</span> <span class="fn">calculateTotal</span>(<span class="var">items</span>: <span class="type">CartItem</span>[]) {</div>
+              <div>  <span class="kw">return</span> <span class="var">items</span>.<span class="fn">reduce</span>((<span class="var">sum</span>, <span class="var">item</span>) =&gt; {</div>
+              <div>    <span id="ghostLine" class="ghost-demo"></span></div>
+              <div style="color:var(--ghost)">  }, 0);</div>
+              <div style="color:var(--ghost)">}</div>
+            </div>
+          </div>
+          <div class="demo-hint">
+            <span>按</span> <kbd>Tab</kbd> <span>接受补全</span>
+            <span style="margin:0 8px;color:var(--text-muted)">·</span>
+            <span>按</span> <kbd>Esc</kbd> <span>取消</span>
+          </div>
+          <div class="step-nav">
+            <button class="btn btn-ghost" onclick="goStep(2)">← 返回</button>
+            <button class="btn btn-primary" onclick="goStep(4)">下一步 →</button>
+          </div>
+        </div>
+
+        <!-- Step 4: Cheat Sheet -->
+        <div class="step" id="step4">
+          <div style="text-align:center;margin-bottom:24px;">
+            <h2 style="font-size:22px;color:var(--text-bright);margin-bottom:6px;">快捷键速查表</h2>
+            <p style="color:var(--text-secondary);font-size:14px;">掌握这些快捷键，效率提升 10x</p>
+          </div>
+          <div class="cheatsheet" id="cheatsheet">
+            <div class="shortcut-item" style="animation-delay:0.05s"><span class="label">AI 代码补全</span><kbd>Tab</kbd></div>
+            <div class="shortcut-item" style="animation-delay:0.1s"><span class="label">取消补全</span><kbd>Esc</kbd></div>
+            <div class="shortcut-item" style="animation-delay:0.15s"><span class="label">打开 Chat 面板</span><kbd>⌘ Shift L</kbd></div>
+            <div class="shortcut-item" style="animation-delay:0.2s"><span class="label">Inline Edit</span><kbd>⌘ K</kbd></div>
+            <div class="shortcut-item" style="animation-delay:0.25s"><span class="label">引用代码到 Chat</span><kbd>Ctrl I</kbd></div>
+            <div class="shortcut-item" style="animation-delay:0.3s"><span class="label">AI 代码审查</span><kbd>⌘ Shift R</kbd></div>
+            <div class="shortcut-item" style="animation-delay:0.35s"><span class="label">切换模型</span><kbd>⌘ Shift M</kbd></div>
+            <div class="shortcut-item" style="animation-delay:0.4s"><span class="label">Token 仪表板</span><kbd>⌘ Shift T</kbd></div>
+          </div>
+          <div class="step-nav">
+            <button class="btn btn-ghost" onclick="goStep(3)">← 返回</button>
+            <button class="btn btn-primary btn-lg" onclick="alert('🎉 开始使用 LinkCode！')">🚀 开始使用 LinkCode</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="onboarding-progress">
+        <div class="onboarding-progress-fill" id="progressBar" style="width: 25%;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div class="status-accent">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.5" fill="none"/></svg>
+      LinkCode
+    </div>
+    <div class="status-bar-left">
+      <div class="status-item">🎯 新手引导 · 步骤 <span id="stepNum">1</span>/4</div>
+    </div>
+    <div class="status-bar-right">
+      <div class="status-item">v1.0.0</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentStep = 1;
+function goStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+  document.querySelectorAll('.step-dot').forEach((d, i) => {
+    d.classList.remove('active', 'done');
+    if (i + 1 < n) d.classList.add('done');
+    else if (i + 1 === n) d.classList.add('active');
+  });
+  document.querySelectorAll('.step-line').forEach((l, i) => {
+    l.classList.toggle('done', i + 1 < n);
+  });
+  document.getElementById('progressBar').style.width = (n * 25) + '%';
+  document.getElementById('stepNum').textContent = n;
+  currentStep = n;
+  if (n === 3) startGhostDemo();
+}
+
+function selectConfig(el) {
+  document.querySelectorAll('.config-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function validateKey() {
+  const status = document.getElementById('keyStatus');
+  const input = document.getElementById('apiKeyInput');
+  status.innerHTML = '<span style="color:var(--warning)">⏳ 验证中...</span>';
+  input.style.borderColor = 'var(--warning)';
+  setTimeout(() => {
+    status.innerHTML = '<span style="color:var(--green)">✅ 验证成功！欢迎回来</span>';
+    input.style.borderColor = 'var(--green)';
+    input.classList.add('success');
+    setTimeout(() => goStep(2), 800);
+  }, 1200);
+}
+
+let ghostTimer;
+function startGhostDemo() {
+  const line = document.getElementById('ghostLine');
+  const text = 'return sum + item.price * item.quantity;';
+  let i = 0;
+  line.textContent = '';
+  line.style.borderRight = '2px solid var(--accent)';
+  clearInterval(ghostTimer);
+  ghostTimer = setInterval(() => {
+    if (i < text.length) {
+      line.textContent += text[i]; i++;
+    } else {
+      clearInterval(ghostTimer);
+      setTimeout(() => {
+        line.textContent = '';
+        startGhostDemo();
+      }, 2000);
+    }
+  }, 50);
+}
+
+document.querySelectorAll('.step-dot').forEach(d => {
+  d.addEventListener('click', () => goStep(parseInt(d.dataset.step)));
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode — 基础设置</title>
+<style>
+:root {
+  --bg-app: #0f0f0f;
+  --bg-surface: #141414;
+  --bg-elevated: #1c1c1c;
+  --bg-hover: #232323;
+  --bg-active: #2a2a2a;
+  --bg-border: #2e2e2e;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-subtle: rgba(124,58,237,0.12);
+  --accent-text: #a78bfa;
+  --text-primary: #e2e2e2;
+  --text-secondary: #888888;
+  --text-tertiary: #555555;
+  --green: #22c55e;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --blue: #3b82f6;
+  --font-ui: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-code: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  font-family: var(--font-ui); font-size: 13px; line-height: 1.5;
+  color: var(--text-primary); background: var(--bg-app); width: 100%; height: 100%; overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+/* VS Code Frame */
+.vscode-frame { width: 100%; height: 100vh; display: flex; flex-direction: column; background: var(--bg-app); overflow: hidden; }
+.vscode-titlebar {
+  height: 36px; background: var(--bg-surface); display: flex; align-items: center;
+  padding: 0 12px; gap: 8px; flex-shrink: 0; border-bottom: 1px solid var(--bg-border);
+}
+.titlebar-dot { width: 12px; height: 12px; border-radius: 50%; }
+.titlebar-dot.close { background: #ff5f57; }
+.titlebar-dot.minimize { background: #ffbd2e; }
+.titlebar-dot.maximize { background: #28c840; }
+.titlebar-title { flex: 1; text-align: center; font-size: 12px; color: var(--text-tertiary); }
+
+.vscode-body { flex: 1; display: flex; overflow: hidden; }
+
+/* Sidebar */
+.vscode-sidebar {
+  width: 48px; background: var(--bg-surface); border-right: 1px solid var(--bg-border);
+  display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 4px; flex-shrink: 0;
+}
+.sidebar-icon {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  color: var(--text-tertiary); cursor: pointer; border-radius: var(--radius-sm);
+  transition: all var(--duration-fast) var(--ease);
+}
+.sidebar-icon:hover { color: var(--text-primary); background: var(--bg-hover); }
+.sidebar-icon.active { color: var(--accent-text); }
+
+/* Settings Content */
+.settings-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Tab Navigation */
+.settings-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--bg-border); background: var(--bg-surface);
+  flex-shrink: 0; padding: 0 16px;
+}
+.settings-tab {
+  padding: 10px 20px; font-size: 12px; font-weight: 500; color: var(--text-secondary);
+  cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all var(--duration-fast) var(--ease); text-decoration: none;
+}
+.settings-tab:hover { color: var(--text-primary); }
+.settings-tab.active { color: var(--accent-text); border-bottom-color: var(--accent); }
+
+.settings-scroll { flex: 1; overflow-y: auto; padding: 24px 32px 64px; max-width: 680px; }
+
+/* Section */
+.section { margin-bottom: 32px; }
+.section-title {
+  font-size: 11px; font-weight: 600; color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--bg-border);
+}
+
+/* Setting Row */
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0; border-bottom: 1px solid rgba(46,46,46,0.5);
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-info { flex: 1; margin-right: 16px; }
+.setting-label { font-size: 13px; color: var(--text-primary); font-weight: 500; margin-bottom: 2px; }
+.setting-desc { font-size: 11px; color: var(--text-tertiary); }
+
+/* Toggle */
+.toggle {
+  width: 36px; height: 20px; border-radius: 10px; background: #333; cursor: pointer;
+  position: relative; transition: background var(--duration-fast) var(--ease);
+  border: none; padding: 0; flex-shrink: 0;
+}
+.toggle::after {
+  content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%;
+  background: #888; top: 2px; left: 2px; transition: all var(--duration-fast) var(--ease);
+}
+.toggle.active { background: var(--accent); }
+.toggle.active::after { left: 18px; background: #fff; }
+
+/* Input */
+.input {
+  width: 100%; padding: 8px 12px; background: var(--bg-elevated); border: 1px solid var(--bg-border);
+  border-radius: var(--radius-md); color: var(--text-primary); font-size: 13px;
+  font-family: var(--font-ui); outline: none; transition: border-color var(--duration-fast);
+}
+.input:focus { border-color: var(--accent); }
+.input::placeholder { color: var(--text-tertiary); }
+.input-mono { font-family: var(--font-code); font-size: 12px; letter-spacing: 0.02em; }
+
+/* Select */
+.select {
+  padding: 6px 10px; background: var(--bg-elevated); border: 1px solid var(--bg-border);
+  border-radius: var(--radius-md); color: var(--text-primary); font-size: 12px;
+  font-family: var(--font-ui); outline: none; cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center; padding-right: 28px;
+}
+.select:focus { border-color: var(--accent); }
+
+/* Button */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px;
+  border-radius: var(--radius-md); font-size: 12px; font-weight: 500;
+  border: 1px solid var(--bg-border); background: var(--bg-elevated); color: var(--text-primary);
+  cursor: pointer; transition: all var(--duration-fast) var(--ease);
+  font-family: var(--font-ui);
+}
+.btn:hover { background: var(--bg-hover); border-color: #3a3a3a; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-danger { background: transparent; border-color: rgba(239,68,68,0.3); color: var(--red); }
+.btn-danger:hover { background: rgba(239,68,68,0.1); }
+
+/* API Key */
+.api-key-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.api-key-row .input { flex: 1; }
+
+/* Badge */
+.badge {
+  display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 3px;
+  font-size: 10px; font-weight: 500;
+}
+.badge-green { background: rgba(34,197,94,0.12); color: var(--green); }
+.badge-yellow { background: rgba(245,158,11,0.12); color: var(--yellow); }
+
+/* Shortcut */
+.shortcut-key {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; height: 22px; padding: 0 6px;
+  background: var(--bg-elevated); border: 1px solid var(--bg-border); border-radius: 4px;
+  font-family: var(--font-ui); font-size: 11px; color: var(--text-secondary);
+  box-shadow: 0 1px 0 var(--bg-border);
+}
+.shortcut-combo { display: flex; gap: 4px; align-items: center; }
+.shortcut-combo span { color: var(--text-tertiary); font-size: 10px; }
+
+/* Status Bar */
+.vscode-statusbar {
+  height: 24px; background: var(--bg-surface); border-top: 1px solid var(--bg-border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 10px;
+  font-size: 11px; flex-shrink: 0;
+}
+.statusbar-left, .statusbar-right { display: flex; align-items: center; gap: 12px; }
+.statusbar-item { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); }
+
+/* Back to Index */
+.back-to-index {
+  position: fixed; top: 42px; right: 12px; z-index: 9999;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; background: rgba(28,28,28,0.9);
+  border: 1px solid #2e2e2e; border-radius: 6px;
+  color: #a78bfa; font-size: 11px; font-weight: 500;
+  cursor: pointer; backdrop-filter: blur(8px);
+  transition: all 0.15s var(--ease); text-decoration: none;
+  font-family: var(--font-ui); opacity: 0.7;
+}
+.back-to-index:hover { opacity: 1; background: rgba(44,44,44,0.95); border-color: #7c3aed; text-decoration: none; }
+</style>
+</head>
+<body>
+<a href="index.html" class="back-to-index">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+  导航页
+</a>
+
+<div class="vscode-frame">
+  <div class="vscode-titlebar">
+    <div class="titlebar-dot close"></div><div class="titlebar-dot minimize"></div><div class="titlebar-dot maximize"></div>
+    <div class="titlebar-title">LinkCode — 设置</div>
+    <div style="width:36px"></div>
+  </div>
+
+  <div class="vscode-body">
+    <div class="vscode-sidebar">
+      <div class="sidebar-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg></div>
+      <div class="sidebar-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+      <div class="sidebar-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+      <div style="flex:1"></div>
+      <div class="sidebar-icon active"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></div>
+    </div>
+
+    <div class="settings-main">
+      <!-- Tab Navigation -->
+      <div class="settings-tabs">
+        <a class="settings-tab active" href="10-settings.html">基础设置</a>
+        <a class="settings-tab" href="10b-advanced-settings.html">高级 / 模型</a>
+      </div>
+
+      <div class="settings-scroll">
+        <!-- Account -->
+        <div class="section">
+          <div class="section-title">👤 账号</div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">登录账号</div>
+              <div class="setting-desc">user@example.com</div>
+            </div>
+            <span class="badge badge-green">已登录</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">套餐方案</div>
+              <div class="setting-desc">Pro · 有效期至 2026-12-31</div>
+            </div>
+            <button class="btn" style="font-size:11px;">管理订阅</button>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">退出登录</div>
+              <div class="setting-desc">清除本地凭证并退出</div>
+            </div>
+            <button class="btn btn-danger" style="font-size:11px;">退出</button>
+          </div>
+        </div>
+
+        <!-- API Key -->
+        <div class="section">
+          <div class="section-title">🔑 API Key 管理</div>
+          <div class="setting-row" style="flex-direction:column; align-items:stretch;">
+            <div class="setting-info" style="margin-bottom:8px;">
+              <div class="setting-label">OpenAI API Key</div>
+              <div class="setting-desc">用于 GPT-4o / GPT-4o-mini 等模型</div>
+            </div>
+            <div class="api-key-row">
+              <input class="input input-mono" type="password" value="sk-proj-****************************" />
+              <button class="btn" style="font-size:11px;">验证</button>
+            </div>
+          </div>
+          <div class="setting-row" style="flex-direction:column; align-items:stretch;">
+            <div class="setting-info" style="margin-bottom:8px;">
+              <div class="setting-label">DeepSeek API Key</div>
+              <div class="setting-desc">用于 DeepSeek-V3 / DeepSeek-R1 等模型</div>
+            </div>
+            <div class="api-key-row">
+              <input class="input input-mono" type="password" value="sk-****************************" />
+              <button class="btn" style="font-size:11px;">验证</button>
+            </div>
+          </div>
+          <div class="setting-row" style="flex-direction:column; align-items:stretch;">
+            <div class="setting-info" style="margin-bottom:8px;">
+              <div class="setting-label">Anthropic API Key</div>
+              <div class="setting-desc">用于 Claude 系列模型</div>
+            </div>
+            <div class="api-key-row">
+              <input class="input input-mono" type="text" placeholder="sk-ant-..." />
+              <button class="btn btn-primary" style="font-size:11px;">添加</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Language & Theme -->
+        <div class="section">
+          <div class="section-title">🌐 语言与主题</div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">界面语言</div>
+              <div class="setting-desc">设置 LinkCode 界面显示语言</div>
+            </div>
+            <select class="select">
+              <option selected>简体中文</option>
+              <option>English</option>
+              <option>日本語</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">AI 回复语言</div>
+              <div class="setting-desc">AI 默认使用的回复语言</div>
+            </div>
+            <select class="select">
+              <option selected>跟随提问语言</option>
+              <option>简体中文</option>
+              <option>English</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">颜色主题</div>
+              <div class="setting-desc">跟随 VS Code 当前主题</div>
+            </div>
+            <select class="select">
+              <option selected>跟随 VS Code</option>
+              <option>暗色</option>
+              <option>亮色</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Shortcuts -->
+        <div class="section">
+          <div class="section-title">⌨️ 快捷键</div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">打开 Chat 面板</div>
+            </div>
+            <div class="shortcut-combo">
+              <span class="shortcut-key">⌘</span>
+              <span>+</span>
+              <span class="shortcut-key">Shift</span>
+              <span>+</span>
+              <span class="shortcut-key">L</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Inline Edit</div>
+            </div>
+            <div class="shortcut-combo">
+              <span class="shortcut-key">⌘</span>
+              <span>+</span>
+              <span class="shortcut-key">K</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">接受 Ghost Text 补全</div>
+            </div>
+            <div class="shortcut-combo">
+              <span class="shortcut-key">Tab</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">引用选中代码</div>
+            </div>
+            <div class="shortcut-combo">
+              <span class="shortcut-key">⌘</span>
+              <span>+</span>
+              <span class="shortcut-key">I</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Updates -->
+        <div class="section">
+          <div class="section-title">🔄 更新</div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">当前版本</div>
+              <div class="setting-desc">LinkCode v2.4.1</div>
+            </div>
+            <span class="badge badge-green">已是最新</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">自动更新</div>
+              <div class="setting-desc">有新版本时自动下载并安装</div>
+            </div>
+            <button class="toggle active" onclick="this.classList.toggle('active')"></button>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">更新频道</div>
+              <div class="setting-desc">Stable 频道更稳定，Insiders 频道更快获得新功能</div>
+            </div>
+            <select class="select">
+              <option selected>Stable</option>
+              <option>Insiders</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="vscode-statusbar">
+    <div class="statusbar-left">
+      <div class="statusbar-item" style="color:var(--accent-text);">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        LinkCode v2.4.1
+      </div>
+    </div>
+    <div class="statusbar-right">
+      <div class="statusbar-item" style="color:var(--green);">⚡ Pro</div>
+      <div class="statusbar-item">设置</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

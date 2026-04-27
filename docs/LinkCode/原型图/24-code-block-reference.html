@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode — 引用代码块交互</title>
+<style>
+/* === LinkCode Design Tokens === */
+:root {
+  --bg-app: #0f0f0f;
+  --bg-surface: #141414;
+  --bg-elevated: #1c1c1c;
+  --bg-hover: #232323;
+  --bg-active: #2a2a2a;
+  --bg-border: #2e2e2e;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-subtle: rgba(124,58,237,0.12);
+  --accent-text: #a78bfa;
+  --text-primary: #e2e2e2;
+  --text-secondary: #888888;
+  --text-tertiary: #555555;
+  --green: #22c55e;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --blue: #3b82f6;
+  --font-ui: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-code: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
+  --font-size: 13px;
+  --line-height: 1.5;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  font-family: var(--font-ui);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  color: var(--text-primary);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  width: 100%; height: 100%; overflow: hidden;
+}
+
+/* === VS Code Frame === */
+.vscode-frame {
+  width: 100%; height: 100vh; display: flex; flex-direction: column;
+  background: var(--bg-app); overflow: hidden;
+}
+.vscode-titlebar {
+  height: 36px; background: var(--bg-surface); display: flex; align-items: center;
+  padding: 0 12px; gap: 8px; flex-shrink: 0; border-bottom: 1px solid var(--bg-border);
+}
+.titlebar-dot { width: 12px; height: 12px; border-radius: 50%; }
+.titlebar-dot.close { background: #ff5f57; }
+.titlebar-dot.minimize { background: #ffbd2e; }
+.titlebar-dot.maximize { background: #28c840; }
+.titlebar-title { flex: 1; text-align: center; font-size: 12px; color: var(--text-tertiary); }
+
+.vscode-body { flex: 1; display: flex; overflow: hidden; }
+
+.vscode-sidebar {
+  width: 48px; background: var(--bg-surface); border-right: 1px solid var(--bg-border);
+  display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 4px; flex-shrink: 0;
+}
+.sidebar-icon {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  color: var(--text-tertiary); cursor: pointer; border-radius: var(--radius-sm);
+  transition: all var(--duration-fast) var(--ease);
+}
+.sidebar-icon:hover { color: var(--text-primary); background: var(--bg-hover); }
+.sidebar-icon.active { color: var(--accent-text); }
+
+.vscode-statusbar {
+  height: 24px; background: var(--bg-surface); border-top: 1px solid var(--bg-border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 10px;
+  font-size: 11px; flex-shrink: 0;
+}
+.statusbar-left, .statusbar-right { display: flex; align-items: center; gap: 12px; }
+.statusbar-item { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); }
+
+/* === Messages === */
+.message { padding: 12px 0; border-bottom: 1px solid var(--bg-border); }
+.message:last-child { border-bottom: none; }
+.msg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.msg-avatar { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+.msg-avatar.user { background: var(--bg-active); color: var(--text-secondary); }
+.msg-avatar.ai { background: var(--accent-subtle); color: var(--accent-text); }
+.msg-name { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+.msg-body { font-size: 13px; line-height: 1.7; color: var(--text-primary); padding-left: 30px; }
+.msg-body p { margin-bottom: 8px; color: var(--text-primary); }
+
+/* === Code Block === */
+.code-block {
+  background: #0f0f0f; border: 1px solid var(--bg-border); border-radius: var(--radius-md);
+  overflow: hidden; margin: 8px 0;
+}
+.code-block-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 12px; background: var(--bg-surface); border-bottom: 1px solid var(--bg-border);
+  height: 28px;
+}
+.code-block-lang {
+  font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; font-weight: 500;
+}
+.code-block-actions { display: flex; gap: 4px; }
+.code-block-actions .btn {
+  font-size: 11px; padding: 2px 8px; border: none; background: transparent;
+  color: var(--text-secondary); cursor: pointer; border-radius: var(--radius-sm);
+  transition: all var(--duration-fast); display: inline-flex; align-items: center; gap: 3px;
+  font-family: var(--font-ui);
+}
+.code-block-actions .btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.code-block pre {
+  padding: 12px 16px; overflow-x: auto; font-family: var(--font-code);
+  font-size: 12px; line-height: 1.6; color: var(--text-primary); margin: 0;
+}
+
+/* === Quote/Reference Button (on code block) === */
+.btn-quote {
+  color: var(--accent-text) !important; font-weight: 500;
+}
+.btn-quote:hover { background: var(--accent-subtle) !important; }
+
+/* === Chat Input === */
+.chat-input-box {
+  display: flex; align-items: flex-end; gap: 8px; background: var(--bg-elevated);
+  border: 1px solid var(--bg-border); border-radius: var(--radius-lg); padding: 8px 12px;
+  transition: border-color var(--duration-fast) var(--ease);
+  position: relative;
+}
+.chat-input-box textarea {
+  flex: 1; border: none; background: transparent; color: var(--text-primary);
+  font-size: 13px; font-family: var(--font-ui); resize: none; outline: none;
+  min-height: 20px; max-height: 120px; line-height: 1.5;
+}
+.chat-input-box textarea::placeholder { color: var(--text-tertiary); }
+.send-btn {
+  width: 28px; height: 28px; border-radius: var(--radius-sm); background: var(--accent);
+  border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all var(--duration-fast) var(--ease); flex-shrink: 0;
+}
+.send-btn:hover { background: var(--accent-hover); }
+.input-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 6px 0 0; }
+.input-toolbar-left { display: flex; gap: 4px; }
+.input-toolbar-left button {
+  padding: 3px 8px; border: none; background: transparent; color: var(--text-tertiary);
+  font-size: 11px; cursor: pointer; border-radius: var(--radius-sm); transition: all var(--duration-fast);
+  display: flex; align-items: center; gap: 4px;
+}
+.input-toolbar-left button:hover { color: var(--text-secondary); background: var(--bg-hover); }
+.model-selector {
+  display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--accent-text);
+  padding: 3px 8px; border-radius: var(--radius-sm);
+}
+
+/* === Quoted Code Card === */
+.quote-card {
+  background: var(--bg-elevated); border: 1px solid rgba(124,58,237,0.25);
+  border-radius: var(--radius-md); margin-bottom: 8px; overflow: hidden;
+  border-left: 3px solid var(--accent);
+}
+.quote-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px; background: rgba(124,58,237,0.06);
+  border-bottom: 1px solid rgba(124,58,237,0.12);
+}
+.quote-card-header-left {
+  display: flex; align-items: center; gap: 6px;
+}
+.quote-card-lang {
+  font-size: 10px; font-weight: 600; color: var(--accent-text);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.quote-card-file {
+  font-size: 10px; color: var(--text-tertiary);
+}
+.quote-card-actions { display: flex; gap: 4px; }
+.quote-card-actions button {
+  background: transparent; border: none; color: var(--text-tertiary);
+  cursor: pointer; padding: 2px; border-radius: 3px; display: flex; align-items: center;
+  transition: all var(--duration-fast);
+}
+.quote-card-actions button:hover { color: var(--text-secondary); background: var(--bg-hover); }
+.quote-card-body {
+  padding: 8px 12px; font-family: var(--font-code); font-size: 11px;
+  line-height: 1.6; color: var(--text-secondary); overflow: hidden;
+}
+.quote-card-body.collapsed { max-height: 80px; position: relative; }
+.quote-card-body.collapsed::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 30px;
+  background: linear-gradient(transparent, var(--bg-elevated));
+}
+.quote-card-expand {
+  display: flex; align-items: center; justify-content: center;
+  padding: 4px; font-size: 10px; color: var(--accent-text);
+  background: rgba(124,58,237,0.04); border-top: 1px solid rgba(124,58,237,0.1);
+  cursor: pointer; gap: 4px; transition: background var(--duration-fast);
+  border: none; width: 100;
+  font-family: var(--font-ui);
+}
+.quote-card-expand:hover { background: rgba(124,58,237,0.08); }
+
+/* === Code Reference in Message === */
+.msg-code-ref {
+  background: var(--bg-elevated); border: 1px solid var(--bg-border);
+  border-radius: var(--radius-md); margin: 8px 0; overflow: hidden;
+  border-left: 3px solid var(--accent);
+}
+.msg-code-ref-header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px; background: rgba(124,58,237,0.06);
+  border-bottom: 1px solid var(--bg-border); font-size: 10px;
+}
+.msg-code-ref-header .ref-icon { color: var(--accent-text); flex-shrink: 0; }
+.msg-code-ref-header .ref-label { color: var(--accent-text); font-weight: 500; }
+.msg-code-ref-header .ref-file { color: var(--text-tertiary); }
+.msg-code-ref-body {
+  padding: 8px 12px; font-family: var(--font-code); font-size: 11px;
+  line-height: 1.5; color: var(--text-secondary); max-height: 72px; overflow: hidden;
+  position: relative;
+}
+.msg-code-ref-body::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 24px;
+  background: linear-gradient(transparent, var(--bg-elevated));
+}
+
+/* === Showcase Layout === */
+.showcase-container {
+  display: flex; flex-direction: column; gap: 48px;
+  padding: 32px 24px; overflow-y: auto; flex: 1;
+}
+.showcase-title {
+  font-size: 11px; font-weight: 600; color: var(--accent-text);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+}
+.showcase-title .num {
+  width: 20px; height: 20px; background: var(--accent-subtle);
+  border-radius: 4px; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: var(--accent); font-weight: 700;
+}
+.showcase-desc {
+  font-size: 11px; color: var(--text-tertiary); margin-bottom: 16px; line-height: 1.6;
+}
+
+/* === Demo Chat === */
+.demo-chat {
+  width: 420px; background: var(--bg-surface); border: 1px solid var(--bg-border);
+  border-radius: var(--radius-lg); overflow: hidden;
+}
+.demo-chat-header {
+  height: 36px; padding: 0 12px; display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid var(--bg-border);
+}
+.demo-chat-header i { color: var(--accent-text); }
+.demo-chat-header span { font-size: 12px; font-weight: 600; }
+.demo-chat-messages { padding: 12px; }
+.demo-chat-input { padding: 12px; border-top: 1px solid var(--bg-border); }
+
+/* === Page Title === */
+.page-title {
+  padding: 24px 32px 0;
+  font-size: 16px; font-weight: 600; color: var(--text-primary);
+  display: flex; align-items: center; gap: 10px;
+}
+.page-title .tag {
+  font-size: 10px; padding: 2px 8px; border-radius: 4px;
+  background: var(--accent-subtle); color: var(--accent-text); font-weight: 500;
+}
+
+/* === Annotation Arrow === */
+.annotation {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin-top: 12px; padding: 8px 12px;
+  background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.15);
+  border-radius: var(--radius-md); font-size: 11px; color: var(--yellow); line-height: 1.5;
+}
+
+/* === Back Nav === */
+.back-to-index {
+  position: fixed; top: 12px; right: 12px; z-index: 9999;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; background: rgba(28,28,28,0.9);
+  border: 1px solid #2e2e2e; border-radius: 6px;
+  color: #a78bfa; font-size: 11px; font-weight: 500;
+  cursor: pointer; backdrop-filter: blur(8px);
+  transition: all 0.15s var(--ease);
+  text-decoration: none; opacity: 0.7;
+}
+.back-to-index:hover { opacity: 1; border-color: var(--accent); text-decoration: none; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+<div class="vscode-frame">
+  <div class="vscode-titlebar">
+    <div class="titlebar-dot close"></div><div class="titlebar-dot minimize"></div><div class="titlebar-dot maximize"></div>
+    <div class="titlebar-title">LinkCode — 引用代码块交互 · 3 种场景</div><div style="width:36px"></div>
+  </div>
+  <div class="vscode-body">
+    <div class="vscode-sidebar">
+      <div class="sidebar-icon"><i data-lucide="files" style="width:20px;height:20px"></i></div>
+      <div class="sidebar-icon"><i data-lucide="search" style="width:20px;height:20px"></i></div>
+      <div class="sidebar-icon"><i data-lucide="git-branch" style="width:20px;height:20px"></i></div>
+      <div class="sidebar-icon active"><i data-lucide="sparkles" style="width:20px;height:20px"></i></div>
+      <div style="flex:1"></div>
+      <div class="sidebar-icon"><i data-lucide="settings" style="width:20px;height:20px"></i></div>
+    </div>
+
+    <div class="showcase-container">
+      <div class="page-title">
+        💬 引用代码块交互
+        <span class="tag">3 种场景</span>
+      </div>
+
+      <!-- Scene A: Click Quote on Code Block -->
+      <div class="showcase-section">
+        <div class="showcase-title"><span class="num">A</span> 点击「引用」→ 折叠卡片附到输入框</div>
+        <div class="showcase-desc">用户在 AI 回复的代码块右上角点击「引用」按钮，代码片段以折叠卡片形式附到输入框上方</div>
+        <div class="demo-chat">
+          <div class="demo-chat-header">
+            <i data-lucide="sparkles" style="width:14px;height:14px"></i>
+            <span>LinkCode</span>
+          </div>
+          <div class="demo-chat-messages">
+            <!-- AI message with code block -->
+            <div class="message">
+              <div class="msg-header">
+                <div class="msg-avatar ai">✦</div>
+                <span class="msg-name" style="color:var(--accent-text)">LinkCode</span>
+                <span style="font-size:10px;color:var(--text-tertiary)">
+                  <span style="width:14px;height:14px;font-size:7px;font-weight:700;color:#fff;background:#4F46E5;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-right:3px">DS</span>
+                  DeepSeek-V3
+                </span>
+              </div>
+              <div class="msg-body">
+                <p>这是 useDebounce hook 的实现：</p>
+                <div class="code-block">
+                  <div class="code-block-header">
+                    <span class="code-block-lang">typescript</span>
+                    <div class="code-block-actions">
+                      <button class="btn">Copy</button>
+                      <button class="btn" style="color:var(--accent-text);font-weight:600">Apply</button>
+                      <button class="btn btn-quote" style="background:var(--accent-subtle);border-radius:4px;">
+                        <i data-lucide="quote" style="width:10px;height:10px"></i> 引用
+                      </button>
+                    </div>
+                  </div>
+                  <pre><span style="color:#c586c0">import</span> { useState, useEffect } <span style="color:#c586c0">from</span> <span style="color:#ce9178">'react'</span>;
+
+<span style="color:#569cd6">export function</span> <span style="color:#dcdcaa">useDebounce</span>&lt;<span style="color:#4ec9b0">T</span>&gt;(
+  value: <span style="color:#4ec9b0">T</span>,
+  delay: <span style="color:#4ec9b0">number</span> = <span style="color:#b5cea8">300</span>
+): <span style="color:#4ec9b0">T</span> {
+  <span style="color:#569cd6">const</span> [debounced, setDebounced] = useState(value);
+
+  useEffect(() =&gt; {
+    <span style="color:#569cd6">const</span> timer = setTimeout(
+      () =&gt; setDebounced(value), delay
+    );
+    <span style="color:#c586c0">return</span> () =&gt; clearTimeout(timer);
+  }, [value, delay]);
+
+  <span style="color:#c586c0">return</span> debounced;
+}</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Input area with collapsed quote card -->
+          <div class="demo-chat-input">
+            <!-- Collapsed quote card -->
+            <div class="quote-card" style="animation:slideUp 0.3s var(--ease);">
+              <div class="quote-card-header">
+                <div class="quote-card-header-left">
+                  <i data-lucide="code-2" style="width:12px;height:12px;color:var(--accent-text)"></i>
+                  <span class="quote-card-lang">TypeScript</span>
+                  <span class="quote-card-file">· useDebounce.ts · 15 行</span>
+                </div>
+                <div class="quote-card-actions">
+                  <button title="展开"><i data-lucide="chevron-down" style="width:12px;height:12px"></i></button>
+                  <button title="移除引用"><i data-lucide="x" style="width:12px;height:12px"></i></button>
+                </div>
+              </div>
+              <div class="quote-card-body collapsed" style="font-size:10px;line-height:1.5;">
+                <span style="color:#c586c0">import</span> { useState, useEffect } <span style="color:#c586c0">from</span> <span style="color:#ce9178">'react'</span>;<br>
+                <span style="color:#569cd6">export function</span> <span style="color:#dcdcaa">useDebounce</span>&lt;T&gt;(<br>
+                &nbsp;&nbsp;value: T, delay: number = 300<br>
+                ): T {<br>
+                &nbsp;&nbsp;<span style="color:#569cd6">const</span> [debounced, set...
+              </div>
+            </div>
+            <div class="chat-input-box" style="border-color:var(--accent);">
+              <textarea rows="1" readonly style="color:var(--text-primary);">这段 hook 能加上 cancel 方法吗？</textarea>
+              <button class="send-btn"><i data-lucide="arrow-up" style="width:16px;height:16px"></i></button>
+            </div>
+          </div>
+        </div>
+        <div class="annotation">
+          <i data-lucide="pointer" style="width:14px;height:14px;flex-shrink:0;margin-top:1px"></i>
+          <span>用户点击代码块右上角的<strong>「引用」</strong>按钮后，代码片段自动以折叠卡片插入输入框上方，方便用户带上下文提问</span>
+        </div>
+      </div>
+
+      <!-- Scene B: Expanded Quote Card -->
+      <div class="showcase-section">
+        <div class="showcase-title"><span class="num">B</span> 引用卡片展开态 — 代码预览</div>
+        <div class="showcase-desc">点击展开按钮后，引用卡片显示完整代码语言标签、前 5 行预览，以及折叠/展开切换按钮</div>
+        <div class="demo-chat">
+          <div class="demo-chat-header">
+            <i data-lucide="sparkles" style="width:14px;height:14px"></i>
+            <span>LinkCode</span>
+          </div>
+          <div class="demo-chat-messages" style="min-height:40px;">
+            <div class="message" style="border:none;padding:8px 0;">
+              <div class="msg-body" style="padding-left:0;">
+                <p style="font-size:11px;color:var(--text-tertiary);font-style:italic;">... 上方对话省略 ...</p>
+              </div>
+            </div>
+          </div>
+          <div class="demo-chat-input">
+            <!-- Expanded quote card -->
+            <div class="quote-card">
+              <div class="quote-card-header">
+                <div class="quote-card-header-left">
+                  <i data-lucide="code-2" style="width:12px;height:12px;color:var(--accent-text)"></i>
+                  <span class="quote-card-lang">TypeScript</span>
+                  <span class="quote-card-file">· useDebounce.ts · 15 行</span>
+                </div>
+                <div class="quote-card-actions">
+                  <button title="折叠"><i data-lucide="chevron-up" style="width:12px;height:12px"></i></button>
+                  <button title="移除引用"><i data-lucide="x" style="width:12px;height:12px"></i></button>
+                </div>
+              </div>
+              <div class="quote-card-body" style="font-size:11px;">
+                <div><span style="color:#c586c0">import</span> { useState, useEffect } <span style="color:#c586c0">from</span> <span style="color:#ce9178">'react'</span>;</div>
+                <div style="height:4px"></div>
+                <div><span style="color:#569cd6">export function</span> <span style="color:#dcdcaa">useDebounce</span>&lt;<span style="color:#4ec9b0">T</span>&gt;(</div>
+                <div>&nbsp;&nbsp;value: <span style="color:#4ec9b0">T</span>,</div>
+                <div>&nbsp;&nbsp;delay: <span style="color:#4ec9b0">number</span> = <span style="color:#b5cea8">300</span></div>
+                <div>): <span style="color:#4ec9b0">T</span> {</div>
+                <div>&nbsp;&nbsp;<span style="color:#569cd6">const</span> [debounced, setDebounced] = useState(value);</div>
+                <div style="height:4px"></div>
+                <div>&nbsp;&nbsp;useEffect(() =&gt; {</div>
+                <div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#569cd6">const</span> timer = setTimeout(</div>
+                <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;() =&gt; setDebounced(value), delay</div>
+                <div>&nbsp;&nbsp;&nbsp;&nbsp;);</div>
+                <div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#c586c0">return</span> () =&gt; clearTimeout(timer);</div>
+                <div>&nbsp;&nbsp;}, [value, delay]);</div>
+                <div style="height:4px"></div>
+                <div>&nbsp;&nbsp;<span style="color:#c586c0">return</span> debounced;</div>
+                <div>}</div>
+              </div>
+              <button class="quote-card-expand">
+                <i data-lucide="chevron-up" style="width:10px;height:10px"></i>
+                收起代码
+              </button>
+            </div>
+            <div class="chat-input-box" style="border-color:var(--accent);">
+              <textarea rows="1" readonly style="color:var(--text-primary);">帮我加一个 cancel 方法和 immediate 参数</textarea>
+              <button class="send-btn"><i data-lucide="arrow-up" style="width:16px;height:16px"></i></button>
+            </div>
+            <div class="input-toolbar">
+              <div class="input-toolbar-left">
+                <button><i data-lucide="at-sign" style="width:12px;height:12px"></i> 引用</button>
+                <button><i data-lucide="paperclip" style="width:12px;height:12px"></i> 附件</button>
+              </div>
+              <div class="model-selector">
+                <span style="width:14px;height:14px;font-size:7px;font-weight:700;color:#fff;background:#4F46E5;border-radius:3px;display:inline-flex;align-items:center;justify-content:center">DS</span>
+                DeepSeek-V3
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene C: Sent Message with Code Reference -->
+      <div class="showcase-section" style="padding-bottom:48px;">
+        <div class="showcase-title"><span class="num">C</span> 发送后 — 消息内的代码引用块</div>
+        <div class="showcase-desc">含引用代码块的消息发出后，消息气泡内显示代码引用块 + 用户的提问文字，AI 依据引用上下文回复</div>
+        <div class="demo-chat">
+          <div class="demo-chat-header">
+            <i data-lucide="sparkles" style="width:14px;height:14px"></i>
+            <span>LinkCode</span>
+          </div>
+          <div class="demo-chat-messages">
+            <!-- Previous AI message (truncated) -->
+            <div class="message">
+              <div class="msg-header">
+                <div class="msg-avatar ai">✦</div>
+                <span class="msg-name" style="color:var(--accent-text)">LinkCode</span>
+              </div>
+              <div class="msg-body">
+                <p>这是 useDebounce hook 的实现：</p>
+                <div class="code-block">
+                  <div class="code-block-header">
+                    <span class="code-block-lang">typescript</span>
+                    <div class="code-block-actions">
+                      <button class="btn">Copy</button>
+                      <button class="btn" style="color:var(--accent-text)">Apply</button>
+                      <button class="btn btn-quote"><i data-lucide="quote" style="width:10px;height:10px"></i> 引用</button>
+                    </div>
+                  </div>
+                  <pre style="max-height:60px;overflow:hidden;position:relative;"><span style="color:#c586c0">import</span> { useState, useEffect } <span style="color:#c586c0">from</span> <span style="color:#ce9178">'react'</span>;
+<span style="color:#569cd6">export function</span> <span style="color:#dcdcaa">useDebounce</span>&lt;T&gt;(value: T, delay = 300)
+  ...</pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- User message with code reference -->
+            <div class="message">
+              <div class="msg-header">
+                <div class="msg-avatar user">U</div>
+                <span class="msg-name">你</span>
+              </div>
+              <div class="msg-body">
+                <!-- Code reference block inside message -->
+                <div class="msg-code-ref">
+                  <div class="msg-code-ref-header">
+                    <i data-lucide="code-2" style="width:11px;height:11px" class="ref-icon"></i>
+                    <span class="ref-label">引用代码</span>
+                    <span class="ref-file">useDebounce.ts · TypeScript · 15 行</span>
+                  </div>
+                  <div class="msg-code-ref-body">
+                    <span style="color:#c586c0">import</span> { useState, useEffect } from 'react';<br>
+                    <span style="color:#569cd6">export function</span> useDebounce&lt;T&gt;(<br>
+                    &nbsp;&nbsp;value: T, delay: number = 300<br>
+                    ): T { ...
+                  </div>
+                </div>
+                <p style="margin:0;">帮我加一个 cancel 方法和 immediate 参数</p>
+              </div>
+            </div>
+
+            <!-- AI Response based on reference -->
+            <div class="message">
+              <div class="msg-header">
+                <div class="msg-avatar ai">✦</div>
+                <span class="msg-name" style="color:var(--accent-text)">LinkCode</span>
+                <span style="font-size:10px;color:var(--text-tertiary)">
+                  <span style="width:14px;height:14px;font-size:7px;font-weight:700;color:#fff;background:#4F46E5;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-right:3px">DS</span>
+                  DeepSeek-V3 · 1,856 tokens
+                </span>
+              </div>
+              <div class="msg-body">
+                <p>好的，基于你引用的 useDebounce，我给它加上了 <code style="background:var(--bg-active);padding:1px 5px;border-radius:3px;font-size:12px;color:var(--accent-text)">cancel</code> 方法和 <code style="background:var(--bg-active);padding:1px 5px;border-radius:3px;font-size:12px;color:var(--accent-text)">immediate</code> 参数：</p>
+                <div class="code-block">
+                  <div class="code-block-header">
+                    <span class="code-block-lang">typescript</span>
+                    <div class="code-block-actions">
+                      <button class="btn">Copy</button>
+                      <button class="btn" style="color:var(--accent-text);font-weight:600">Apply</button>
+                    </div>
+                  </div>
+                  <pre><span style="color:#569cd6">export function</span> <span style="color:#dcdcaa">useDebounce</span>&lt;<span style="color:#4ec9b0">T</span>&gt;(
+  value: <span style="color:#4ec9b0">T</span>,
+  delay = <span style="color:#b5cea8">300</span>,
+  <span style="color:#9cdcfe">options</span>?: { immediate?: <span style="color:#4ec9b0">boolean</span> }
+) {
+  <span style="color:#569cd6">const</span> [debounced, setDebounced] = useState(value);
+  <span style="color:#569cd6">const</span> timerRef = useRef&lt;NodeJS.Timeout&gt;();
+
+  <span style="color:#569cd6">const</span> <span style="color:#dcdcaa">cancel</span> = useCallback(() =&gt; {
+    <span style="color:#c586c0">if</span> (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
+
+  useEffect(() =&gt; {
+    <span style="color:#c586c0">if</span> (options?.immediate &amp;&amp; !timerRef.current) {
+      setDebounced(value);
+    }
+    timerRef.current = setTimeout(
+      () =&gt; setDebounced(value), delay
+    );
+    <span style="color:#c586c0">return</span> cancel;
+  }, [value, delay]);
+
+  <span style="color:#c586c0">return</span> { value: debounced, cancel };
+}</pre>
+                </div>
+                <p style="font-size:12px;color:var(--text-secondary);">主要改动：<br>• 返回值从 <code style="background:var(--bg-active);padding:1px 4px;border-radius:2px;font-size:11px">T</code> 改为 <code style="background:var(--bg-active);padding:1px 4px;border-radius:2px;font-size:11px">{ value, cancel }</code><br>• 新增 <code style="background:var(--bg-active);padding:1px 4px;border-radius:2px;font-size:11px">immediate</code> 选项：首次调用立即执行<br>• <code style="background:var(--bg-active);padding:1px 4px;border-radius:2px;font-size:11px">cancel()</code> 方法清除 pending timer</p>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;font-size:10px;color:var(--text-tertiary);padding-left:30px;margin-top:8px;">
+                <span>💰 ¥0.004</span>
+                <span style="color:var(--green)">如使用 GPT-4o 需 ¥0.048（省了 92%）</span>
+              </div>
+            </div>
+          </div>
+          <div class="demo-chat-input">
+            <div class="chat-input-box">
+              <textarea rows="1" placeholder="继续提问..." readonly></textarea>
+              <button class="send-btn"><i data-lucide="arrow-up" style="width:16px;height:16px"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /showcase-container -->
+  </div><!-- /vscode-body -->
+  <div class="vscode-statusbar">
+    <div class="statusbar-left">
+      <span class="statusbar-item"><i data-lucide="git-branch" style="width:12px;height:12px"></i> main</span>
+      <span class="statusbar-item">TypeScript</span>
+    </div>
+    <div class="statusbar-right">
+      <span class="statusbar-item" style="color:var(--green)">⚡ ¥38.48 余额</span>
+    </div>
+  </div>
+</div>
+
+<a href="index.html" class="back-to-index">
+  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+  导航页
+</a>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+});
+</script>
+</body>
+</html>

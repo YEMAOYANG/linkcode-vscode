@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode - 主编辑器 + AI 补全</title>
+<link rel="stylesheet" href="shared-styles.css">
+<style>
+body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.current-line { background: rgba(255,255,255,0.04); }
+.ghost-inline {
+  color: var(--ghost);
+  font-style: normal;
+}
+.completion-tooltip {
+  position: absolute;
+  right: 200px;
+  top: 228px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 10;
+}
+.completion-tooltip kbd {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-family: 'Inter', sans-serif;
+  color: var(--text-primary);
+}
+.minimap {
+  width: 60px;
+  background: var(--bg-primary);
+  border-left: 1px solid var(--border);
+  opacity: 0.5;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.minimap-line {
+  height: 2px;
+  margin: 1px 6px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 1px;
+}
+.minimap-line.highlight { background: rgba(124, 92, 252, 0.3); }
+.file-tree-item {
+  padding: 3px 8px 3px 24px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+.file-tree-item:hover { background: var(--bg-hover); }
+.file-tree-item.active { color: var(--text-bright); background: var(--bg-selected); }
+.file-tree-item .icon { font-size: 14px; width: 16px; text-align: center; }
+.folder-toggle { padding: 3px 8px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; color: var(--text-primary); font-weight: 500; }
+.folder-toggle:hover { background: var(--bg-hover); }
+.breadcrumb { padding: 4px 16px; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); display: flex; gap: 4px; background: var(--bg-primary); }
+.breadcrumb span { cursor: pointer; }
+.breadcrumb span:hover { color: var(--text-primary); }
+.model-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 8px;
+}
+.model-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+</style>
+</head>
+<body>
+<div class="macos-window">
+  <div class="titlebar">
+    <div class="traffic-lights"><span class="tl-close"></span><span class="tl-minimize"></span><span class="tl-maximize"></span></div>
+    <div class="titlebar-text">app.tsx — my-project — LinkCode</div>
+  </div>
+  <div class="vscode-layout">
+    <!-- Activity Bar -->
+    <div class="activity-bar">
+      <div class="activity-icon active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7v10l4-3V10L3 7zm0 0l9-4 9 4M12 3v18m0 0l9-4V7"/></svg>
+      </div>
+      <div class="activity-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+      </div>
+      <div class="activity-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7.03 3 3 7.03 3 12h3l-4 4-4-4h3c0-5.52 4.48-10 10-10V3zm0 18c4.97 0 9-4.03 9-9h-3l4-4 4 4h-3c0 5.52-4.48 10-10 10v-1z"/></svg>
+      </div>
+      <div class="activity-icon" title="LinkCode AI">
+        <svg viewBox="0 0 24 24" fill="none"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#5ea2ef"/></linearGradient></defs><path d="M12 2L2 7l10 5 10-5-10-5z" fill="url(#lg)" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="url(#lg)" stroke-width="1.5" fill="none"/></svg>
+      </div>
+      <div class="activity-spacer"></div>
+      <div class="activity-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4m-8.66-2.34l2.83-2.83m11.66-5.66l2.83-2.83M1 12h4m14 0h4m-2.34-8.66l-2.83 2.83M6.17 17.17l-2.83 2.83"/></svg>
+      </div>
+    </div>
+    <!-- Sidebar: Explorer -->
+    <div class="sidebar">
+      <div class="sidebar-header">资源管理器</div>
+      <div style="padding:6px 0;">
+        <div class="folder-toggle">▾ 📁 my-project</div>
+        <div class="folder-toggle" style="padding-left:20px;">▾ 📁 src</div>
+        <div class="file-tree-item active" style="padding-left:40px;"><span class="icon" style="color:#3178c6;">TS</span> app.tsx</div>
+        <div class="file-tree-item" style="padding-left:40px;"><span class="icon" style="color:#3178c6;">TS</span> index.ts</div>
+        <div class="file-tree-item" style="padding-left:40px;"><span class="icon" style="color:#e44d26;">◇</span> styles.css</div>
+        <div class="folder-toggle" style="padding-left:20px;">▸ 📁 components</div>
+        <div class="folder-toggle" style="padding-left:20px;">▸ 📁 utils</div>
+        <div class="folder-toggle" style="padding-left:20px;">▸ 📁 api</div>
+        <div class="file-tree-item"><span class="icon">📄</span> package.json</div>
+        <div class="file-tree-item"><span class="icon">📄</span> tsconfig.json</div>
+        <div class="file-tree-item"><span class="icon">📄</span> .env</div>
+      </div>
+    </div>
+    <!-- Editor -->
+    <div class="editor-area">
+      <div class="tab-bar">
+        <div class="tab active"><span class="tab-icon" style="color:#3178c6;">TS</span> app.tsx <span class="tab-close">×</span></div>
+        <div class="tab"><span class="tab-icon">TS</span> index.ts <span class="tab-close">×</span></div>
+      </div>
+      <div class="breadcrumb">
+        <span>src</span> <span style="color:#555">›</span> <span>app.tsx</span> <span style="color:#555">›</span> <span style="color:var(--yellow)">fetchUserData</span>
+      </div>
+      <div style="display:flex;flex:1;overflow:hidden;position:relative;">
+        <div class="editor-content" style="flex:1;">
+          <div class="code-editor">
+            <div class="line-numbers">
+              <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div><div>13</div><div>14</div><div>15</div><div>16</div><div>17</div><div>18</div><div>19</div><div>20</div><div>21</div><div>22</div><div>23</div><div>24</div><div>25</div><div>26</div><div>27</div><div>28</div><div>29</div><div>30</div><div>31</div><div>32</div>
+            </div>
+            <div class="code-lines">
+              <div><span class="kw">import</span> { <span class="var">useState</span>, <span class="var">useEffect</span> } <span class="kw">from</span> <span class="str">'react'</span>;</div>
+              <div><span class="kw">import</span> { <span class="type">User</span>, <span class="type">ApiResponse</span> } <span class="kw">from</span> <span class="str">'./types'</span>;</div>
+              <div><span class="kw">import</span> { <span class="var">apiClient</span> } <span class="kw">from</span> <span class="str">'./api/client'</span>;</div>
+              <div></div>
+              <div><span class="cm">// 获取用户数据的自定义 Hook</span></div>
+              <div><span class="kw">export const</span> <span class="fn">useUserData</span> = (<span class="var">userId</span>: <span class="type">string</span>) => {</div>
+              <div>  <span class="kw">const</span> [<span class="var">user</span>, <span class="fn">setUser</span>] = <span class="fn">useState</span>&lt;<span class="type">User</span> | <span class="type">null</span>&gt;(<span class="bl">null</span>);</div>
+              <div>  <span class="kw">const</span> [<span class="var">loading</span>, <span class="fn">setLoading</span>] = <span class="fn">useState</span>(<span class="bl">true</span>);</div>
+              <div>  <span class="kw">const</span> [<span class="var">error</span>, <span class="fn">setError</span>] = <span class="fn">useState</span>&lt;<span class="type">Error</span> | <span class="type">null</span>&gt;(<span class="bl">null</span>);</div>
+              <div></div>
+              <div>  <span class="fn">useEffect</span>(() => {</div>
+              <div class="current-line">    <span class="kw">const</span> <span class="fn">fetchUserData</span> = <span class="kw">async</span> () => {<span class="ghost-inline"> </span></div>
+              <div><span class="ghost-text">      try {</span></div>
+              <div><span class="ghost-text">        setLoading(true);</span></div>
+              <div><span class="ghost-text">        const response: ApiResponse&lt;User&gt; = await apiClient.get(`/users/${userId}`);</span></div>
+              <div><span class="ghost-text">        setUser(response.data);</span></div>
+              <div><span class="ghost-text">      } catch (err) {</span></div>
+              <div><span class="ghost-text">        setError(err instanceof Error ? err : new Error('未知错误'));</span></div>
+              <div><span class="ghost-text">      } finally {</span></div>
+              <div><span class="ghost-text">        setLoading(false);</span></div>
+              <div><span class="ghost-text">      }</span></div>
+              <div><span class="ghost-text">    };</span></div>
+              <div></div>
+              <div><span class="ghost-text">    fetchUserData();</span></div>
+              <div><span class="ghost-text">  }, [userId]);</span></div>
+              <div></div>
+              <div><span class="ghost-text">  return { user, loading, error };</span></div>
+              <div><span class="ghost-text">};</span></div>
+              <div></div>
+              <div><span class="cm">// 主应用组件</span></div>
+              <div><span class="kw">export default function</span> <span class="fn">App</span>() {</div>
+              <div>  <span class="kw">const</span> { <span class="var">user</span>, <span class="var">loading</span> } = <span class="fn">useUserData</span>(<span class="str">'current'</span>);</div>
+            </div>
+          </div>
+          <!-- Completion Tooltip -->
+          <div class="completion-tooltip">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="#7c3aed" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="#7c3aed" stroke-width="1.5" fill="none"/></svg>
+            LinkCode · 按 <kbd>Tab</kbd> 接受 · <kbd>Esc</kbd> 取消
+          </div>
+        </div>
+        <!-- Minimap -->
+        <div class="minimap">
+          <div style="padding-top:8px;">
+            <div class="minimap-line" style="width:20px;"></div>
+            <div class="minimap-line" style="width:30px;"></div>
+            <div class="minimap-line" style="width:28px;"></div>
+            <div class="minimap-line" style="width:0;"></div>
+            <div class="minimap-line" style="width:25px;"></div>
+            <div class="minimap-line" style="width:35px;"></div>
+            <div class="minimap-line" style="width:38px;"></div>
+            <div class="minimap-line" style="width:35px;"></div>
+            <div class="minimap-line" style="width:38px;"></div>
+            <div class="minimap-line" style="width:0;"></div>
+            <div class="minimap-line" style="width:18px;"></div>
+            <div class="minimap-line highlight" style="width:32px;"></div>
+            <div class="minimap-line highlight" style="width:15px;"></div>
+            <div class="minimap-line highlight" style="width:25px;"></div>
+            <div class="minimap-line highlight" style="width:42px;"></div>
+            <div class="minimap-line highlight" style="width:22px;"></div>
+            <div class="minimap-line highlight" style="width:28px;"></div>
+            <div class="minimap-line highlight" style="width:40px;"></div>
+            <div class="minimap-line highlight" style="width:25px;"></div>
+            <div class="minimap-line highlight" style="width:22px;"></div>
+            <div class="minimap-line highlight" style="width:12px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <div class="status-accent">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.5" fill="none"/></svg>
+      LinkCode
+    </div>
+    <div class="status-bar-left">
+      <div class="status-item">
+        <span class="model-dot"></span> DeepSeek-V3
+      </div>
+      <div class="status-item">⚡ 自动路由</div>
+      <div class="status-item">🪙 余额: ¥12.50</div>
+    </div>
+    <div class="status-bar-right">
+      <div class="status-item">第 12 行, 第 45 列</div>
+      <div class="status-item">UTF-8</div>
+      <div class="status-item">TypeScript React</div>
+      <div class="status-item">Prettier</div>
+    </div>
+  </div>
+</div>
+<script>
+// Ghost Text typing animation
+const ghostLines = document.querySelectorAll('.ghost-text');
+let currentLine = 0;
+const originalTexts = [];
+ghostLines.forEach(g => { originalTexts.push(g.textContent); g.textContent = ''; g.style.visibility = 'hidden'; });
+
+function typeGhostLine(lineIdx) {
+  if (lineIdx >= ghostLines.length) {
+    // Reset after pause
+    setTimeout(() => {
+      ghostLines.forEach((g, i) => { g.textContent = ''; g.style.visibility = 'hidden'; });
+      currentLine = 0;
+      typeGhostLine(0);
+    }, 3000);
+    return;
+  }
+  const el = ghostLines[lineIdx];
+  const text = originalTexts[lineIdx];
+  el.style.visibility = 'visible';
+  let i = 0;
+  const timer = setInterval(() => {
+    if (i < text.length) {
+      el.textContent = text.substring(0, i + 1);
+      i++;
+    } else {
+      clearInterval(timer);
+      setTimeout(() => typeGhostLine(lineIdx + 1), 80);
+    }
+  }, 25);
+}
+setTimeout(() => typeGhostLine(0), 1000);
+
+// Status bar live update
+const balanceEl = document.querySelector('.status-item:last-child');
+</script>
+</body>
+</html>

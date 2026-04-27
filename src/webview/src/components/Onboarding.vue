@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
+import { Icon } from '@iconify/vue'
 import { useVSCode } from '../composables/useVSCode'
 import { usePlatform } from '../composables/usePlatform'
-import { MODEL_TO_GROUP } from '../../../shared/constants'
+import {
+  TOKEN_GROUPS,
+  inferTokenGroup,
+} from '../../../shared/constants'
+import { Button, Dialog, Input, Tabs, type TabItem } from '../ui'
 
 interface ModelInfo {
   id: string
@@ -11,30 +16,48 @@ interface ModelInfo {
   tag?: string
 }
 
-const MAIN_GROUPS = [
-  { id: 'Claude_aws', label: 'Claude (AWS)', hint: 'claude-sonnet-4-6, claude-opus-4-6' },
-  { id: 'deepseek_tencent', label: 'DeepSeek (腾讯)', hint: 'deepseek-r1, deepseek-v3' },
-  { id: 'gemini_Google', label: 'Gemini (Google)', hint: 'gemini-2.5-pro, gemini-2.5-flash' },
-  { id: 'gpt_Azure', label: 'GPT (Azure)', hint: 'gpt-5, gpt-5.1' },
-]
+const MAIN_GROUPS = TOKEN_GROUPS.slice(0, 8).map(g => ({
+  id: g.id,
+  label: g.label,
+  hint: g.models.slice(0, 3).join(', '),
+}))
 
-const props = defineProps<{
-  models: ModelInfo[]
-}>()
+function inferProviderFromId(id: string): string {
+  if (id.startsWith('claude') || id.startsWith('cursor-')) return 'Anthropic'
+  if (id.startsWith('gpt') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4')) return 'OpenAI'
+  if (id.startsWith('gemini')) return 'Google'
+  if (id.startsWith('deepseek') || id.startsWith('DeepSeek')) return 'DeepSeek'
+  if (id.startsWith('qwen') || id.startsWith('Qwen') || id.startsWith('QwQ')) return 'Qwen'
+  if (id.startsWith('glm') || id.startsWith('chatglm')) return 'GLM'
+  if (id.startsWith('hunyuan')) return 'HunYuan'
+  if (id.startsWith('kimi') || id.startsWith('moonshot')) return 'Kimi'
+  if (id.toLowerCase().startsWith('minimax') || id.startsWith('M2-')) return 'MiniMax'
+  if (id.startsWith('stepfun/') || id.startsWith('step-')) return 'StepFun'
+  return 'Smoothlink'
+}
 
-const emit = defineEmits<{
-  complete: []
-  skip: []
-}>()
+const props = defineProps<{ models: ModelInfo[] }>()
+const emit = defineEmits<{ complete: []; skip: [] }>()
 
 const { postMessage, onMessage } = useVSCode()
 const { modKey } = usePlatform()
 
-const currentStep = ref(1)
-const selectedModel = ref('claude-sonnet-4-6')
+const dialogOpen = ref(true)
+watch(dialogOpen, (v) => { if (!v) emit('skip') })
 
-// Step 2: Token configuration
+const currentStep = ref(1)
+const selectedModel = ref('')
+
 const tokenMode = ref<'quick' | 'groups'>('quick')
+const tokenModeValue = computed({
+  get: () => tokenMode.value as string,
+  set: (v: string) => { tokenMode.value = v as 'quick' | 'groups' },
+})
+const tokenModeTabs: TabItem[] = [
+  { label: '⚡ 快速开始', value: 'quick' },
+  { label: '🔧 分组配置', value: 'groups' },
+]
+
 const quickToken = ref('')
 const quickTokenVisible = ref(false)
 const verifying = ref(false)
@@ -42,13 +65,11 @@ const verifyResult = ref<{ success: boolean; message: string } | null>(null)
 const quickDetectedGroup = ref<string | null>(null)
 const quickDetectedModels = ref<string[]>([])
 
-// Group-specific tokens
 const groupTokens = ref<Record<string, string>>({})
 const groupVerifying = ref<Record<string, boolean>>({})
 const groupVerified = ref<Record<string, boolean>>({})
 const addingGroupId = ref<string | null>(null)
 
-/** Recommended groups for State B (exclude already configured) */
 const RECOMMEND_ORDER = [
   { id: 'deepseek_tencent', label: 'DeepSeek (腾讯)', models: ['deepseek-r1', 'deepseek-v3', 'deepseek-v3.1', 'deepseek-v3.2'] },
   { id: 'gemini_Google', label: 'Gemini (Google)', models: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-image'] },
@@ -59,26 +80,71 @@ const RECOMMEND_ORDER = [
 const configuredGroups = computed(() => {
   const ids = new Set<string>()
   if (quickDetectedGroup.value) ids.add(quickDetectedGroup.value)
-  for (const [gId, verified] of Object.entries(groupVerified.value)) {
-    if (verified) ids.add(gId)
+  for (const [gId, v] of Object.entries(groupVerified.value)) {
+    if (v) ids.add(gId)
   }
   return [...ids]
 })
 
-const availableModels = computed(() =>
-  props.models.filter(m => {
-    const group = MODEL_TO_GROUP[m.id]
-    return !group || configuredGroups.value.includes(group)
-  })
+/**
+ * 直接使用 Token 验证后 /v1/models 返回的模型列表，不做 MODEL_TO_GROUP 静态过滤。
+ * 来源：quickDetectedModels（快速探测）+ props.models（后端聚合）。
+ */
+const availableModels = computed<ModelInfo[]>(() => {
+  const propsById = new Map<string, ModelInfo>(props.models.map(m => [m.id, m]))
+  const seen = new Set<string>()
+  const result: ModelInfo[] = []
+
+  const pushModel = (id: string) => {
+    if (seen.has(id)) return
+    seen.add(id)
+    const fromProps = propsById.get(id)
+    result.push({
+      id,
+      label: fromProps?.label ?? id,
+      provider: fromProps?.provider ?? inferProviderFromId(id),
+      tag: fromProps?.tag,
+    })
+  }
+
+  // 快速探测返回的模型优先
+  for (const id of quickDetectedModels.value) {
+    pushModel(id)
+  }
+
+  // 追加后端聚合的其余模型
+  for (const model of props.models) {
+    pushModel(model.id)
+  }
+
+  return result
+})
+
+function pickDefaultModel(): string {
+  const list = availableModels.value
+  if (list.length === 0) return ''
+  return list[0].id
+}
+
+// 确保 selectedModel 始终指向一个可用模型；已配置分组变化时自动调整
+watch(
+  [availableModels, configuredGroups],
+  () => {
+    if (availableModels.value.length === 0) return
+    if (!availableModels.value.some(m => m.id === selectedModel.value)) {
+      selectedModel.value = pickDefaultModel()
+    }
+  },
+  { immediate: true, deep: true },
 )
 
 const recommendedGroups = computed(() => {
-  const configuredIds = new Set<string>()
-  if (quickDetectedGroup.value) configuredIds.add(quickDetectedGroup.value)
-  for (const [gId, verified] of Object.entries(groupVerified.value)) {
-    if (verified) configuredIds.add(gId)
+  const done = new Set<string>()
+  if (quickDetectedGroup.value) done.add(quickDetectedGroup.value)
+  for (const [gId, v] of Object.entries(groupVerified.value)) {
+    if (v) done.add(gId)
   }
-  return RECOMMEND_ORDER.filter(g => !configuredIds.has(g.id)).slice(0, 2)
+  return RECOMMEND_ORDER.filter(g => !done.has(g.id)).slice(0, 2)
 })
 
 const cleanupValidation = onMessage((event: MessageEvent) => {
@@ -91,25 +157,27 @@ const cleanupValidation = onMessage((event: MessageEvent) => {
   }
   if (msg.type === 'apiKeyValidated') {
     verifying.value = false
-    if (msg.success) {
-      verifyResult.value = { success: true, message: '✓ 连接成功' }
-    } else {
-      verifyResult.value = { success: false, message: `✗ 验证失败: ${msg.message || '请检查 Token'}` }
-    }
+    verifyResult.value = msg.success
+      ? { success: true, message: '✓ 连接成功' }
+      : { success: false, message: `✗ 验证失败: ${msg.message || '请检查 Token'}` }
   }
   if (msg.type === 'groupTokenValidated' && msg.group) {
     if (msg.group === '_detect') {
-      // Quick start detection
       verifying.value = false
       if (msg.success && msg.models) {
-        verifyResult.value = { success: true, message: '✓ Token 有效' }
-        const detected = detectGroup(msg.models)
-        if (detected) {
+        const detected = inferTokenGroup(msg.models)
+        if (detected !== 'unknown') {
+          const groupLabel = TOKEN_GROUPS.find(g => g.id === detected)?.label ?? detected
+          verifyResult.value = { success: true, message: `✓ Token 有效，已识别分组: ${groupLabel}` }
           quickDetectedGroup.value = detected
           quickDetectedModels.value = msg.models
-          // Sync to group config side
           groupTokens.value[detected] = quickToken.value.trim()
           groupVerified.value[detected] = true
+        } else {
+          verifyResult.value = {
+            success: true,
+            message: '⚠️ Token 有效但无法自动识别分组，请手动到「分组配置」选择',
+          }
         }
       } else {
         verifyResult.value = { success: false, message: `✗ 验证失败: ${msg.message || '请检查 Token'}` }
@@ -121,29 +189,7 @@ const cleanupValidation = onMessage((event: MessageEvent) => {
   }
 })
 
-onUnmounted(() => {
-  cleanupValidation()
-})
-
-function detectGroup(modelIds: string[]): string | null {
-  const MODEL_TO_GROUP: Record<string, string> = {
-    'claude-sonnet-4-6': 'Claude_aws', 'claude-opus-4-6': 'Claude_aws', 'claude-haiku-4-5-20251001': 'Claude_aws',
-    'deepseek-r1': 'deepseek_tencent', 'deepseek-v3': 'deepseek_tencent',
-    'gemini-2.5-pro': 'gemini_Google', 'gemini-2.5-flash': 'gemini_Google',
-    'gpt-5': 'gpt_Azure', 'gpt-5.1': 'gpt_Azure',
-  }
-  const counts: Record<string, number> = {}
-  for (const id of modelIds) {
-    const g = MODEL_TO_GROUP[id]
-    if (g) counts[g] = (counts[g] ?? 0) + 1
-  }
-  let best: string | null = null
-  let bestCount = 0
-  for (const [g, c] of Object.entries(counts)) {
-    if (c > bestCount) { bestCount = c; best = g }
-  }
-  return best
-}
+onUnmounted(() => { cleanupValidation() })
 
 const hasAnyToken = computed(() => {
   if (verifyResult.value?.success) return true
@@ -166,21 +212,16 @@ watch(groupTokens, (tokens) => {
   }
 }, { deep: true })
 
-const progressDots = computed(() => {
-  return [1, 2, 3, 4].map(n => ({
+const progressDots = computed(() =>
+  [1, 2, 3, 4].map(n => ({
     step: n,
     active: n === currentStep.value,
     done: n < currentStep.value,
-  }))
-})
+  })),
+)
 
-function nextStep() {
-  if (currentStep.value < 4) currentStep.value++
-}
-
-function prevStep() {
-  if (currentStep.value > 1) currentStep.value--
-}
+function nextStep() { if (currentStep.value < 4) currentStep.value++ }
+function prevStep() { if (currentStep.value > 1) currentStep.value-- }
 
 function verifyQuickToken() {
   if (!quickToken.value.trim()) return
@@ -200,6 +241,12 @@ function saveQuickToken() {
 }
 
 function resetQuickVerify() {
+  const prev = quickDetectedGroup.value
+  if (prev) {
+    delete groupTokens.value[prev]
+    groupVerified.value[prev] = false
+    postMessage({ type: 'deleteGroupToken', group: prev })
+  }
   verifyResult.value = null
   quickDetectedGroup.value = null
   quickDetectedModels.value = []
@@ -219,29 +266,24 @@ function selectModel(modelId: string) {
 }
 
 function finishOnboarding() {
-  // Save quick token as general key if used
-  if (quickToken.value.trim()) {
-    saveQuickToken()
-  }
+  if (quickToken.value.trim()) saveQuickToken()
   postMessage({ type: 'updateConfig', key: 'model', value: selectedModel.value })
   postMessage({ type: 'onboardingComplete' })
   emit('complete')
 }
 
 const shortcuts = [
-  { icon: 'tab', name: '接受补全', desc: '接受 Ghost Text 建议', keys: ['Tab'] },
-  { icon: 'sparkle', name: '引用代码到 Chat', desc: '选中代码 → 发送到 AI 对话', keys: [modKey, 'Shift', 'I'] },
-  { icon: 'pencil', name: 'Inline Edit', desc: '选中代码原地编辑', keys: [modKey, 'Shift', 'K'] },
-  { icon: 'chat', name: '打开 Chat 面板', desc: '与 AI 对话', keys: [modKey, 'Shift', 'L'] },
-  { icon: 'review', name: '代码审查', desc: 'Git Diff 一键审查', keys: [modKey, 'Shift', 'R'] },
+  { name: '接受补全', desc: '接受 Ghost Text 建议', keys: ['Tab'] },
+  { name: '引用代码到 Chat', desc: '选中代码 → 发送到 AI 对话', keys: [modKey, 'Shift', 'I'] },
+  { name: 'Inline Edit', desc: '选中代码原地编辑', keys: [modKey, 'Shift', 'K'] },
+  { name: '打开 Chat 面板', desc: '与 AI 对话', keys: [modKey, 'Shift', 'L'] },
+  { name: '代码审查', desc: 'Git Diff 一键审查', keys: [modKey, 'Shift', 'R'] },
 ]
 </script>
 
 <template>
-  <div class="ob-overlay">
-    <div class="ob-bg" />
-    <div class="ob-card">
-      <!-- Progress dots -->
+  <Dialog v-model:open="dialogOpen" size="sm" class="ob-dialog" hide-close>
+    <template #header>
       <div class="ob-progress">
         <div
           v-for="dot in progressDots"
@@ -250,19 +292,15 @@ const shortcuts = [
           :class="{ active: dot.active, done: dot.done }"
         />
       </div>
+    </template>
 
-      <!-- Step 1: Welcome -->
-      <template v-if="currentStep === 1">
-        <div class="ob-icon">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-button-bg)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
-            <path d="M20 3v4"/><path d="M22 5h-4"/>
-            <path d="M4 17v2"/><path d="M5 18H3"/>
-          </svg>
+    <template v-if="currentStep === 1">
+      <div class="ob-step1">
+        <div class="ob-welcome-icon">
+          <Icon icon="lucide:sparkles" :width="40" :height="40" />
         </div>
         <div class="ob-title">欢迎使用 LinkCode</div>
         <div class="ob-subtitle">AI 多模型编程助手 · 比 Cursor 省 50%</div>
-
         <div class="ob-features">
           <div class="ob-feature">
             <span class="ob-feature-icon">🧠</span>
@@ -280,44 +318,26 @@ const shortcuts = [
             <span class="ob-feature-label">国内直连</span>
           </div>
         </div>
+      </div>
+    </template>
 
-        <button class="ob-btn ob-btn-primary" @click="nextStep">
-          开始配置 <svg class="ob-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-        </button>
-        <div class="ob-skip" @click="emit('skip')">稍后再说，先体验免费额度</div>
-      </template>
+    <template v-if="currentStep === 2">
+      <div class="ob-title">🔑 配置 API Token</div>
+      <div class="ob-subtitle">每个模型分组需要单独的 Token</div>
 
-      <!-- Step 2: Multi-Token Setup -->
-      <template v-if="currentStep === 2">
-        <div class="ob-title">🔑 配置 API Token</div>
-        <div class="ob-subtitle">每个模型分组需要单独的 Token</div>
-
-        <!-- Mode switcher -->
-        <div class="ob-mode-tabs">
-          <button class="ob-mode-tab" :class="{ active: tokenMode === 'quick' }" @click="tokenMode = 'quick'">
-            ⚡ 快速开始
-          </button>
-          <button class="ob-mode-tab" :class="{ active: tokenMode === 'groups' }" @click="tokenMode = 'groups'">
-            🔧 分组配置
-          </button>
-        </div>
-
-        <!-- Quick Start Mode -->
-        <template v-if="tokenMode === 'quick'">
-          <!-- State A: Input phase (no detection yet) -->
+      <Tabs v-model="tokenModeValue" :tabs="tokenModeTabs" size="sm" class="ob-mode-tabs">
+        <template #quick>
           <template v-if="!quickDetectedGroup">
             <div class="ob-form-group">
               <label class="ob-form-label">输入任意一个 Token，自动探测分组</label>
               <div class="ob-input-wrap">
-                <input
+                <Input
                   v-model="quickToken"
                   :type="quickTokenVisible ? 'text' : 'password'"
-                  class="ob-input"
                   placeholder="sk-xxx...xxxx"
-                >
+                />
                 <button class="ob-toggle-vis" @click="quickTokenVisible = !quickTokenVisible">
-                  <svg v-if="quickTokenVisible" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  <Icon :icon="quickTokenVisible ? 'lucide:eye' : 'lucide:eye-off'" :width="14" :height="14" />
                 </button>
               </div>
               <div v-if="verifyResult && !verifyResult.success" class="ob-verify-result error">
@@ -325,613 +345,397 @@ const shortcuts = [
               </div>
             </div>
 
-            <button
-              class="ob-btn"
+            <Button
+              block
               :disabled="quickToken.trim().length < 8 || verifying"
+              :loading="verifying"
               @click="verifyQuickToken"
             >
-              <template v-if="verifying">
-                <span class="ob-spinner" /> 验证中...
-              </template>
-              <template v-else>
-                验证并探测
-              </template>
-            </button>
+              {{ verifying ? '验证中...' : '验证并探测' }}
+            </Button>
           </template>
 
-          <!-- State B: Verification success — show group + recommend more -->
-          <template v-if="quickDetectedGroup">
-            <div class="ob-success-panel">
-              <div class="ob-verify-result success">✅ 令牌验证成功！</div>
-
-              <div class="ob-detected-info">
-                <div class="ob-detected-group">已识别分组：<strong>{{ quickDetectedGroup }}</strong></div>
-                <div class="ob-detected-models">
-                  已解锁 {{ quickDetectedModels.length }} 个模型：
-                  <span v-for="(m, i) in quickDetectedModels.slice(0, 4)" :key="m">
-                    {{ m }}<template v-if="i < Math.min(quickDetectedModels.length, 4) - 1">、</template>
-                  </span>
-                  <span v-if="quickDetectedModels.length > 4" class="ob-more-models">+{{ quickDetectedModels.length - 4 }} 个</span>
-                </div>
-                <button class="ob-reverify-btn" @click="resetQuickVerify">更换令牌</button>
+          <div v-else class="ob-success-panel">
+            <div class="ob-verify-result success">✅ 令牌验证成功！</div>
+            <div class="ob-detected-info lc-card">
+              <div class="ob-detected-group">已识别分组：<strong>{{ quickDetectedGroup }}</strong></div>
+              <div class="ob-detected-models">
+                已解锁 {{ quickDetectedModels.length }} 个模型：
+                <span v-for="(m, i) in quickDetectedModels.slice(0, 4)" :key="m">
+                  {{ m }}<template v-if="i < Math.min(quickDetectedModels.length, 4) - 1">、</template>
+                </span>
+                <span v-if="quickDetectedModels.length > 4" class="ob-more-models">+{{ quickDetectedModels.length - 4 }} 个</span>
               </div>
-
-              <!-- Recommend more groups -->
-              <template v-if="recommendedGroups.length > 0">
-                <div class="ob-recommend-title">── 推荐继续配置（解锁更多模型）──</div>
-                <div v-for="rg in recommendedGroups" :key="rg.id" class="ob-recommend-item">
-                  <template v-if="addingGroupId !== rg.id">
-                    <div class="ob-recommend-info">
-                      <div class="ob-recommend-name">{{ rg.label }}</div>
-                      <div class="ob-recommend-hint">{{ rg.models.slice(0, 3).join('、') }}</div>
-                    </div>
-                    <button v-if="!groupVerified[rg.id]" class="ob-btn-sm" @click="addingGroupId = rg.id">+ 添加</button>
-                    <span v-else class="ob-group-status success">✅</span>
-                  </template>
-                  <template v-else>
-                    <div class="ob-group-input-row" style="width: 100%;">
-                      <input v-model="groupTokens[rg.id]" type="password" class="ob-input ob-group-token-input" :placeholder="`粘贴 ${rg.id} 分组令牌...`">
-                      <button class="ob-btn-sm" :disabled="!groupTokens[rg.id]?.trim() || groupVerifying[rg.id]" @click="verifyGroupToken(rg.id)">
-                        {{ groupVerifying[rg.id] ? '...' : '验证并添加' }}
-                      </button>
-                      <button class="ob-btn-sm" style="background: var(--lc-elevated); color: var(--lc-text-secondary);" @click="addingGroupId = null">取消</button>
-                    </div>
-                  </template>
-                </div>
-              </template>
+              <Button size="sm" variant="ghost" class="ob-reverify-btn" @click="resetQuickVerify">更换令牌</Button>
             </div>
-          </template>
+
+            <template v-if="recommendedGroups.length > 0">
+              <div class="ob-recommend-title">── 推荐继续配置（解锁更多模型）──</div>
+              <div v-for="rg in recommendedGroups" :key="rg.id" class="ob-recommend-item lc-card">
+                <template v-if="addingGroupId !== rg.id">
+                  <div class="ob-recommend-info">
+                    <div class="ob-recommend-name">{{ rg.label }}</div>
+                    <div class="ob-recommend-hint">{{ rg.models.slice(0, 3).join('、') }}</div>
+                  </div>
+                  <Button v-if="!groupVerified[rg.id]" size="sm" variant="primary" @click="addingGroupId = rg.id">+ 添加</Button>
+                  <span v-else class="ob-group-status success">✅</span>
+                </template>
+                <template v-else>
+                  <div class="ob-group-input-row">
+                    <Input
+                      v-model="groupTokens[rg.id]"
+                      type="password"
+                      size="sm"
+                      :placeholder="`粘贴 ${rg.id} 分组令牌...`"
+                    />
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      :disabled="!groupTokens[rg.id]?.trim() || groupVerifying[rg.id]"
+                      :loading="groupVerifying[rg.id]"
+                      @click="verifyGroupToken(rg.id)"
+                    >
+                      {{ groupVerifying[rg.id] ? '...' : '验证并添加' }}
+                    </Button>
+                    <Button size="sm" variant="ghost" @click="addingGroupId = null">取消</Button>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
         </template>
 
-        <!-- Group Config Mode -->
-        <template v-if="tokenMode === 'groups'">
+        <template #groups>
           <div class="ob-group-list">
-            <div v-for="group in MAIN_GROUPS" :key="group.id" class="ob-group-item">
+            <div v-for="group in MAIN_GROUPS" :key="group.id" class="ob-group-item lc-card">
               <div class="ob-group-header">
                 <span class="ob-group-name">{{ group.label }}</span>
                 <span v-if="groupVerified[group.id]" class="ob-group-status success">✓</span>
               </div>
               <div class="ob-group-hint">{{ group.hint }}</div>
               <div class="ob-group-input-row">
-                <input
+                <Input
                   v-model="groupTokens[group.id]"
                   type="password"
-                  class="ob-input ob-group-token-input"
+                  size="sm"
                   placeholder="sk-..."
-                >
-                <button
-                  class="ob-btn-sm"
+                />
+                <Button
+                  size="sm"
+                  variant="primary"
                   :disabled="!groupTokens[group.id]?.trim() || groupVerifying[group.id]"
+                  :loading="groupVerifying[group.id]"
                   @click="verifyGroupToken(group.id)"
                 >
                   {{ groupVerifying[group.id] ? '...' : '验证' }}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
         </template>
+      </Tabs>
 
-        <div class="ob-btn-row">
-          <button class="ob-btn" @click="prevStep"><svg class="ob-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> 上一步</button>
-          <button v-if="quickDetectedGroup" class="ob-btn" @click="saveQuickToken(); nextStep()">
-            跳过，稍后设置
-          </button>
-          <button class="ob-btn ob-btn-primary" :disabled="!hasAnyToken" @click="saveQuickToken(); nextStep()">
-            继续 <svg class="ob-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-          </button>
-        </div>
+      <div class="ob-help">
+        📋 还没有 Token？去 <a href="https://smoothlink.ai" @click.prevent="postMessage({ type: 'openExternal', url: 'https://smoothlink.ai/register' })">Smoothlink 获取</a>
+      </div>
+      <div class="ob-hint">💡 新用户注册即送 ¥5 免费额度</div>
+    </template>
 
-        <div class="ob-help">
-          📋 还没有 Token？去 <a href="https://smoothlink.ai" @click.prevent="postMessage({ type: 'openExternal', url: 'https://smoothlink.ai/register' })">Smoothlink 获取</a>
-        </div>
-        <div class="ob-hint">💡 新用户注册即送 ¥5 免费额度</div>
-      </template>
+    <template v-if="currentStep === 3">
+      <div class="ob-title">🤖 选择默认模型</div>
+      <div class="ob-subtitle">你可以随时在聊天中切换模型</div>
+      <div class="ob-model-list">
+        <button
+          v-for="model in availableModels"
+          :key="model.id"
+          class="ob-model-row lc-card"
+          :class="{ selected: model.id === selectedModel }"
+          @click="selectModel(model.id)"
+        >
+          <div class="ob-model-info">
+            <span class="ob-model-name">{{ model.label }}</span>
+            <span v-if="model.tag" class="ob-model-tag">{{ model.tag }}</span>
+          </div>
+          <span class="ob-model-provider">{{ model.provider }}</span>
+          <span v-if="model.id === selectedModel" class="ob-check">✓</span>
+        </button>
+      </div>
+    </template>
 
-      <!-- Step 3: Select Model -->
-      <template v-if="currentStep === 3">
-        <div class="ob-title">🤖 选择默认模型</div>
-        <div class="ob-subtitle">你可以随时在聊天中切换模型</div>
-
-        <div class="ob-model-list">
-          <button
-            v-for="model in availableModels"
-            :key="model.id"
-            class="ob-model-row"
-            :class="{ selected: model.id === selectedModel }"
-            @click="selectModel(model.id)"
-          >
-            <div class="ob-model-info">
-              <span class="ob-model-name">{{ model.label }}</span>
-              <span v-if="model.tag" class="ob-model-tag">{{ model.tag }}</span>
-            </div>
-            <span class="ob-model-provider">{{ model.provider }}</span>
-            <span v-if="model.id === selectedModel" class="ob-check">✓</span>
-          </button>
-        </div>
-
-        <div class="ob-btn-row">
-          <button class="ob-btn" @click="prevStep"><svg class="ob-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> 上一步</button>
-          <button class="ob-btn ob-btn-primary" @click="nextStep">下一步 <svg class="ob-arrow-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
-        </div>
-      </template>
-
-      <!-- Step 4: Shortcuts / Finish -->
-      <template v-if="currentStep === 4">
-        <div class="ob-title">⌨️ 掌握核心快捷键</div>
-        <div class="ob-subtitle">这些快捷键让你事半功倍</div>
-
-        <div class="ob-shortcut-list">
-          <div
-            v-for="sc in shortcuts"
-            :key="sc.name"
-            class="ob-shortcut-card"
-          >
-            <div class="ob-sc-left">
-              <div>
-                <div class="ob-sc-name">{{ sc.name }}</div>
-                <div class="ob-sc-desc">{{ sc.desc }}</div>
-              </div>
-            </div>
-            <div class="ob-sc-keys">
-              <span v-for="k in sc.keys" :key="k" class="ob-sc-key">{{ k }}</span>
-            </div>
+    <template v-if="currentStep === 4">
+      <div class="ob-title">⌨️ 掌握核心快捷键</div>
+      <div class="ob-subtitle">这些快捷键让你事半功倍</div>
+      <div class="ob-shortcut-list">
+        <div v-for="sc in shortcuts" :key="sc.name" class="ob-shortcut-card lc-card">
+          <div>
+            <div class="ob-sc-name">{{ sc.name }}</div>
+            <div class="ob-sc-desc">{{ sc.desc }}</div>
+          </div>
+          <div class="ob-sc-keys">
+            <span v-for="k in sc.keys" :key="k" class="ob-sc-key">{{ k }}</span>
           </div>
         </div>
+      </div>
+      <div class="ob-hint">可在设置中随时自定义快捷键</div>
+    </template>
 
-        <button class="ob-btn ob-btn-primary ob-btn-full" @click="finishOnboarding">
-          ✨ 完成配置，开始使用
-        </button>
-        <div class="ob-hint">可在设置中随时自定义快捷键</div>
+    <template #footer>
+      <template v-if="currentStep === 1">
+        <Button variant="primary" block @click="nextStep">
+          开始配置
+          <Icon icon="lucide:arrow-right" :width="14" :height="14" />
+        </Button>
+        <Button variant="ghost" block class="ob-skip-btn" @click="emit('skip')">
+          稍后再说，先体验免费额度
+        </Button>
       </template>
-    </div>
-  </div>
+      <template v-else-if="currentStep === 2">
+        <div class="ob-btn-row">
+          <Button @click="prevStep">
+            <Icon icon="lucide:arrow-left" :width="14" :height="14" />
+            上一步
+          </Button>
+          <Button v-if="quickDetectedGroup" @click="saveQuickToken(); nextStep()">
+            跳过，稍后设置
+          </Button>
+          <Button variant="primary" :disabled="!hasAnyToken" @click="saveQuickToken(); nextStep()">
+            继续
+            <Icon icon="lucide:arrow-right" :width="14" :height="14" />
+          </Button>
+        </div>
+      </template>
+      <template v-else-if="currentStep === 3">
+        <div class="ob-btn-row">
+          <Button @click="prevStep">
+            <Icon icon="lucide:arrow-left" :width="14" :height="14" />
+            上一步
+          </Button>
+          <Button variant="primary" @click="nextStep">
+            下一步
+            <Icon icon="lucide:arrow-right" :width="14" :height="14" />
+          </Button>
+        </div>
+      </template>
+      <template v-else>
+        <Button variant="primary" block @click="finishOnboarding">
+          ✨ 完成配置，开始使用
+        </Button>
+      </template>
+    </template>
+  </Dialog>
 </template>
 
 <style scoped>
-.ob-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  display: flex;
-  align-items: center;
+.ob-dialog :deep(.ui-dialog__header) {
   justify-content: center;
-  animation: fadeIn 0.2s ease;
-}
-
-.ob-bg {
-  position: absolute;
-  inset: 0;
-  background: var(--color-bg);
-  opacity: 0.95;
-}
-
-.ob-card {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: 420px;
-  padding: 32px 24px;
-  text-align: center;
-  animation: slideUp 0.3s var(--lc-ease, ease);
+  padding: var(--lcc-space-4) var(--lcc-space-4) 0;
+  border-bottom: none;
 }
 
 .ob-progress {
   display: flex;
   gap: 6px;
   justify-content: center;
-  margin-bottom: 24px;
 }
-
 .ob-dot {
   width: 24px;
   height: 3px;
   border-radius: 2px;
-  background: var(--lc-active);
-  transition: all 0.4s ease;
+  background: var(--lcc-bg-active);
+  transition: all var(--lcc-duration-base) var(--lcc-ease-out);
 }
-
 .ob-dot.active {
-  background: var(--lc-accent, #7c3aed);
+  background: var(--lcc-accent);
   width: 40px;
 }
+.ob-dot.done { background: color-mix(in srgb, var(--lcc-accent) 60%, transparent); }
 
-.ob-dot.done {
-  background: var(--lc-accent-text, #a78bfa);
-}
-
-.ob-icon {
+.ob-step1 { text-align: center; }
+.ob-welcome-icon {
+  display: flex;
+  justify-content: center;
   margin-bottom: 16px;
+  color: var(--lcc-accent);
 }
 
 .ob-title {
-  font-size: 18px;
+  font-size: var(--lcc-font-lg);
   font-weight: 700;
-  color: var(--lc-text-primary);
+  color: var(--lcc-text);
   margin-bottom: 6px;
+  text-align: center;
 }
-
 .ob-subtitle {
-  font-size: 12px;
-  color: var(--lc-text-tertiary);
-  margin-bottom: 24px;
+  font-size: var(--lcc-font-xs);
+  color: var(--lcc-text-subtle);
+  margin-bottom: 20px;
+  text-align: center;
 }
 
 .ob-features {
   display: flex;
   justify-content: center;
   gap: 24px;
-  margin-bottom: 28px;
+  margin-bottom: 8px;
 }
-
-.ob-feature {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
+.ob-feature { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .ob-feature-icon { font-size: 20px; }
-.ob-feature-value { font-size: 13px; font-weight: 600; color: var(--lc-text-primary); }
-.ob-feature-label { font-size: 11px; color: var(--lc-text-tertiary); }
+.ob-feature-value { font-size: 13px; font-weight: 600; color: var(--lcc-text); }
+.ob-feature-label { font-size: 11px; color: var(--lcc-text-subtle); }
 
-.ob-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 20px;
-  border: 1px solid var(--lc-border);
-  border-radius: var(--lc-radius-md, 6px);
-  background: var(--lc-elevated);
-  color: var(--lc-text-primary);
-  font-size: 13px;
-  font-family: var(--lc-font-ui);
-  cursor: pointer;
-  transition: all 120ms;
-  width: 100%;
-}
+.ob-mode-tabs { margin-bottom: 8px; }
 
-.ob-btn:hover:not(:disabled) {
-  background: var(--lc-hover);
-}
-
-.ob-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.ob-btn-primary {
-  background: var(--lc-accent, #7c3aed);
-  border-color: var(--lc-accent, #7c3aed);
-  color: #fff;
-  font-weight: 600;
-}
-
-.ob-btn-primary:hover:not(:disabled) {
-  background: var(--lc-accent-hover, #6d28d9);
-}
-
-.ob-btn-full { width: 100%; }
-
-.ob-arrow-icon {
-  vertical-align: middle;
-  flex-shrink: 0;
-}
-
-.ob-btn-row {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.ob-btn-row .ob-btn { flex: 1; }
-
-.ob-skip {
-  margin-top: 12px;
-  font-size: 12px;
-  color: var(--lc-text-tertiary);
-  cursor: pointer;
-}
-
-.ob-skip:hover { color: var(--lc-text-secondary); }
-
-.ob-form-group {
-  margin-bottom: 16px;
-  text-align: left;
-}
-
+.ob-form-group { margin-bottom: 12px; }
 .ob-form-label {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
-  color: var(--lc-text-secondary);
+  color: var(--lcc-text-muted);
   margin-bottom: 6px;
 }
-
-.ob-input-wrap {
-  position: relative;
-}
-
-.ob-input {
-  width: 100%;
-  padding: 10px 40px 10px 12px;
-  background: var(--lc-elevated);
-  border: 1px solid var(--lc-border);
-  border-radius: var(--lc-radius-md, 6px);
-  color: var(--lc-text-primary);
-  font-size: 13px;
-  font-family: var(--lc-font-code);
-  outline: none;
-  transition: border-color 120ms;
-}
-
-.ob-input:focus {
-  border-color: var(--lc-accent, #7c3aed);
-}
-
+.ob-input-wrap { position: relative; }
+.ob-input-wrap :deep(.ui-input) { padding-right: 36px; }
 .ob-toggle-vis {
   position: absolute;
-  right: 10px;
+  right: 8px;
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: var(--lc-text-tertiary);
+  color: var(--lcc-text-subtle);
   cursor: pointer;
   padding: 4px;
+  display: inline-flex;
+  align-items: center;
 }
-
-.ob-toggle-vis:hover { color: var(--lc-text-secondary); }
+.ob-toggle-vis:hover { color: var(--lcc-text-muted); }
 
 .ob-verify-result {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  border-radius: var(--lc-radius-md, 6px);
+  border-radius: var(--lcc-radius-md);
   font-size: 12px;
   margin-top: 8px;
 }
-
 .ob-verify-result.success {
-  background: rgba(34, 197, 94, 0.1);
-  color: var(--lc-green, #22c55e);
+  background: color-mix(in srgb, var(--lcc-success) 10%, transparent);
+  color: var(--lcc-success);
 }
-
 .ob-verify-result.error {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--lc-red, #ef4444);
+  background: color-mix(in srgb, var(--lcc-danger) 10%, transparent);
+  color: var(--lcc-danger);
 }
 
-.ob-spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
+.ob-success-panel { text-align: left; }
+.ob-detected-info { margin: 12px 0; padding: 10px 12px; }
+.ob-detected-group { font-size: 12px; color: var(--lcc-text); margin-bottom: 4px; }
+.ob-detected-models { font-size: 11px; color: var(--lcc-text-subtle); line-height: 1.6; }
+.ob-more-models { color: var(--lcc-accent); }
+.ob-reverify-btn { margin-top: 8px; }
+
+.ob-recommend-title {
+  font-size: 11px; color: var(--lcc-text-subtle); text-align: center;
+  margin: 14px 0 10px;
 }
+.ob-recommend-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 10px 12px; margin-bottom: 6px;
+}
+.ob-recommend-info { flex: 1; min-width: 0; }
+.ob-recommend-name { font-size: 12px; color: var(--lcc-text); font-weight: 500; }
+.ob-recommend-hint { font-size: 10px; color: var(--lcc-text-subtle); margin-top: 2px; }
+
+.ob-group-list { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.ob-group-item { padding: 10px 12px; }
+.ob-group-header { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.ob-group-name { font-size: 12px; font-weight: 500; color: var(--lcc-text); }
+.ob-group-status.success { color: var(--lcc-success); font-weight: 600; font-size: 12px; }
+.ob-group-hint { font-size: 10px; color: var(--lcc-text-subtle); margin-bottom: 6px; }
+.ob-group-input-row { display: flex; gap: 6px; align-items: center; }
+.ob-group-input-row > :deep(.ui-input) { flex: 1; min-width: 0; }
 
 .ob-help {
   text-align: center;
   margin-top: 16px;
   font-size: 12px;
-  color: var(--lc-text-tertiary);
+  color: var(--lcc-text-subtle);
 }
-
-.ob-help a { color: var(--lc-accent-text, #a78bfa); }
+.ob-help a { color: var(--lcc-accent); }
 
 .ob-hint {
   text-align: center;
   margin-top: 10px;
   font-size: 11px;
-  color: var(--lc-text-tertiary);
+  color: var(--lcc-text-subtle);
 }
 
 .ob-model-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-bottom: 16px;
   max-height: 280px;
   overflow-y: auto;
   text-align: left;
 }
-
 .ob-model-row {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border: 1px solid var(--lc-border);
-  border-radius: var(--lc-radius-md, 6px);
-  background: var(--lc-elevated);
   cursor: pointer;
-  transition: all 120ms;
-  font-family: var(--lc-font-ui);
-  color: var(--lc-text-primary);
+  transition: all var(--lcc-duration-fast) var(--lcc-ease-out);
+  color: var(--lcc-text);
   width: 100%;
   text-align: left;
 }
-
-.ob-model-row:hover {
-  background: var(--lc-hover);
-}
-
+.ob-model-row:hover { background: var(--lcc-bg-hover); }
 .ob-model-row.selected {
-  border-color: var(--lc-accent, #7c3aed);
-  background: var(--lc-accent-subtle, rgba(124, 58, 237, 0.12));
+  border-color: var(--lcc-accent);
+  background: color-mix(in srgb, var(--lcc-accent) 12%, transparent);
 }
-
-.ob-model-info {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
+.ob-model-info { flex: 1; display: flex; align-items: center; gap: 6px; }
 .ob-model-name { font-size: 13px; }
-
 .ob-model-tag {
   font-size: 10px;
   padding: 1px 5px;
   border-radius: 3px;
-  background: rgba(124, 58, 237, 0.12);
-  color: var(--lc-accent-text, #a78bfa);
+  background: color-mix(in srgb, var(--lcc-accent) 16%, transparent);
+  color: var(--lcc-accent);
 }
-
-.ob-model-provider {
-  font-size: 11px;
-  color: var(--lc-text-tertiary);
-}
-
-.ob-check {
-  color: var(--lc-accent-text, #a78bfa);
-  font-weight: 600;
-}
+.ob-model-provider { font-size: 11px; color: var(--lcc-text-subtle); }
+.ob-check { color: var(--lcc-accent); font-weight: 600; }
 
 .ob-shortcut-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 20px;
   text-align: left;
 }
-
 .ob-shortcut-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  background: var(--lc-elevated);
-  border: 1px solid var(--lc-border);
-  border-radius: var(--lc-radius-md, 6px);
-  transition: background 120ms;
+  transition: background var(--lcc-duration-fast) var(--lcc-ease-out);
 }
-
-.ob-shortcut-card:hover {
-  background: var(--lc-hover);
-}
-
-.ob-sc-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.ob-sc-name { font-size: 13px; color: var(--lc-text-primary); }
-.ob-sc-desc { font-size: 11px; color: var(--lc-text-tertiary); margin-top: 2px; }
-
-.ob-sc-keys {
-  display: flex;
-  gap: 4px;
-}
-
+.ob-shortcut-card:hover { background: var(--lcc-bg-hover); }
+.ob-sc-name { font-size: 13px; color: var(--lcc-text); }
+.ob-sc-desc { font-size: 11px; color: var(--lcc-text-subtle); margin-top: 2px; }
+.ob-sc-keys { display: flex; gap: 4px; }
 .ob-sc-key {
   padding: 3px 8px;
-  background: var(--lc-active);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--lcc-bg-active);
+  border: 1px solid var(--lcc-border-subtle);
   border-radius: 4px;
   font-size: 11px;
-  color: var(--lc-text-secondary);
-  font-family: var(--lc-font-code);
+  color: var(--lcc-text-muted);
+  font-family: var(--lcc-font-code);
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+.ob-btn-row { display: flex; gap: 8px; width: 100%; }
+.ob-btn-row > :deep(.ui-button) { flex: 1; }
 
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Mode tabs */
-.ob-mode-tabs {
-  display: flex; gap: 4px; margin-bottom: 16px;
-  background: var(--lc-elevated); border-radius: var(--lc-radius-md, 6px); padding: 3px;
-}
-.ob-mode-tab {
-  flex: 1; padding: 7px 0; background: transparent; border: none;
-  border-radius: var(--lc-radius-sm, 4px); color: var(--lc-text-tertiary);
-  font-size: 12px; font-family: var(--lc-font-ui); cursor: pointer; transition: all 120ms;
-}
-.ob-mode-tab.active { background: var(--lc-accent, #7c3aed); color: #fff; }
-
-/* Group list */
-.ob-group-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; text-align: left; }
-.ob-group-item {
-  padding: 10px 12px; border: 1px solid var(--lc-border);
-  border-radius: var(--lc-radius-md, 6px); background: var(--lc-elevated);
-}
-.ob-group-header { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
-.ob-group-name { font-size: 12px; font-weight: 500; color: var(--lc-text-primary); }
-.ob-group-status.success { color: var(--lc-green, #22c55e); font-weight: 600; font-size: 12px; }
-.ob-group-hint { font-size: 10px; color: var(--lc-text-tertiary); margin-bottom: 6px; }
-.ob-group-input-row { display: flex; gap: 6px; align-items: center; }
-.ob-group-token-input { max-width: 200px; padding: 6px 8px; font-size: 11px; }
-
-.ob-btn-sm {
-  padding: 5px 10px; background: var(--lc-accent, #7c3aed);
-  border: none; border-radius: var(--lc-radius-md, 6px); color: #fff;
-  font-size: 11px; cursor: pointer; font-family: var(--lc-font-ui);
-  transition: background 120ms; white-space: nowrap;
-}
-.ob-btn-sm:hover:not(:disabled) { background: var(--lc-accent-hover, #6d28d9); }
-.ob-btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* Detect result */
-.ob-detect-result {
-  margin-top: 8px; padding: 8px 12px; border-radius: var(--lc-radius-md, 6px);
-  background: rgba(34, 197, 94, 0.08); font-size: 11px;
-  color: var(--lc-green, #22c55e); line-height: 1.5;
-}
-.ob-detect-result strong { color: var(--lc-green, #22c55e); }
-
-/* State B success panel */
-.ob-success-panel { text-align: left; }
-.ob-detected-info {
-  margin: 12px 0; padding: 10px 12px;
-  background: var(--lc-elevated); border: 1px solid var(--lc-border);
-  border-radius: var(--lc-radius-md, 6px);
-}
-.ob-detected-group { font-size: 12px; color: var(--lc-text-primary); margin-bottom: 4px; }
-.ob-detected-models { font-size: 11px; color: var(--lc-text-tertiary); line-height: 1.6; }
-.ob-more-models { color: var(--lc-accent-text, #a78bfa); }
-.ob-recommend-title {
-  font-size: 11px; color: var(--lc-text-tertiary); text-align: center;
-  margin: 14px 0 10px;
-}
-.ob-recommend-item {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 12px; margin-bottom: 6px;
-  background: var(--lc-elevated); border: 1px solid var(--lc-border);
-  border-radius: var(--lc-radius-md, 6px);
-}
-.ob-recommend-info { flex: 1; }
-.ob-recommend-name { font-size: 12px; color: var(--lc-text-primary); font-weight: 500; }
-.ob-recommend-hint { font-size: 10px; color: var(--lc-text-tertiary); margin-top: 2px; }
-
-.ob-reverify-btn {
-  margin-top: 8px;
-  padding: 4px 10px;
-  background: none;
-  border: 1px solid var(--lc-border);
-  border-radius: var(--lc-radius-sm, 4px);
-  color: var(--lc-text-tertiary);
-  font-size: 11px;
-  font-family: var(--lc-font-ui);
-  cursor: pointer;
-  transition: all 120ms;
-}
-.ob-reverify-btn:hover {
-  color: var(--lc-text-secondary);
-  border-color: var(--lc-text-tertiary);
-}
+.ob-skip-btn { margin-top: 8px; }
 </style>

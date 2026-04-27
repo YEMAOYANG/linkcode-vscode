@@ -36,18 +36,6 @@ export const DEFAULT_MODEL = 'claude-sonnet-4-6'
 /** Default inline completion model (fast & cheap) */
 export const DEFAULT_COMPLETION_MODEL = 'claude-haiku-4-5-20251001'
 
-/** Recommended models list for UI display */
-export const RECOMMENDED_MODELS = [
-  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'Anthropic', tag: '推荐' },
-  { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'Anthropic', tag: '最强推理' },
-  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', provider: 'Anthropic', tag: '最快' },
-  { id: 'deepseek-r1', label: 'DeepSeek R1', provider: 'DeepSeek', tag: '强推理' },
-  { id: 'deepseek-v3', label: 'DeepSeek V3', provider: 'DeepSeek', tag: '性价比' },
-  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', provider: 'Google', tag: '长上下文' },
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Google', tag: '快速' },
-  { id: 'gpt-5', label: 'GPT-5', provider: 'OpenAI', tag: '' },
-] as const
-
 /**
  * Model → Token Group mapping for Smoothlink multi-token routing.
  * Each group requires a separate API token.
@@ -215,3 +203,37 @@ export const TOKEN_GROUPS: TokenGroupDef[] = [
 
 /** Priority order for recommending unconfigured groups */
 export const RECOMMENDED_GROUP_ORDER = ['deepseek_tencent', 'gemini_Google', 'gpt_Azure', 'scnet'] as const
+
+/**
+ * Fallback "fastest" completion model per group — used for Phase 5D graceful
+ * degradation when the configured `linkcode.completionModel` has no token.
+ * Ordered by preferred fallback priority.
+ */
+export const GROUP_FAST_COMPLETION_MODEL: Record<string, string> = {
+  Claude_aws: 'claude-haiku-4-5-20251001',
+  gemini_Google: 'gemini-2.5-flash-lite',
+  deepseek_tencent: 'deepseek-v3',
+  gpt_Azure: 'gpt-5.1-codex',
+  aliyun: 'qwen3.5-plus',
+  'scnet-low': 'MiniMax-M2.5',
+  MiniMax: 'MiniMax-M2.1-highspeed',
+  hunyuan_tencent: 'hunyuan-2.0-instruct',
+  other_tencent: 'glm-5',
+  scnet: 'Qwen3-30B-A3B-Instruct-2507',
+  Echo: 'claude-opus-4-6',
+  stepfun_openrouter: 'stepfun/step-3.5-flash:free',
+}
+
+/** Preferred order of degradation fallback. */
+export const FAST_COMPLETION_GROUP_PRIORITY = [
+  'gemini_Google',
+  'deepseek_tencent',
+  'gpt_Azure',
+  'aliyun',
+  'scnet-low',
+  'MiniMax',
+  'hunyuan_tencent',
+  'other_tencent',
+  'scnet',
+  'stepfun_openrouter',
+] as const

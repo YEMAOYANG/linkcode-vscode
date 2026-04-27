@@ -1,7 +1,8 @@
 /**
  * Shared module — cross-module types, constants, and errors.
  */
-export type { ExtToWebMsg, WebToExtMsg, CodeContext, StoredChatMessage, SessionSummary } from './types'
+export type { ExtToWebMsg, WebToExtMsg, CodeContext, StoredChatMessage, SessionSummary, ChatMode } from './types'
+export { SYSTEM_PROMPTS, BUILD_FROM_PLAN_TEMPLATE } from './prompts'
 export { LinkCodeError, ApiError, AuthError } from './errors'
 export {
   DEBOUNCE_MS,
@@ -17,7 +18,6 @@ export {
   DEFAULT_COMPLETION_MODEL,
   MODEL_TO_GROUP,
   GROUP_TO_MODELS,
-  RECOMMENDED_MODELS,
   RECOMMENDED_GROUP_ORDER,
   TOKEN_GROUPS,
   inferTokenGroup,

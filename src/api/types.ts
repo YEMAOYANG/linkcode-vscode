@@ -7,6 +7,10 @@ export interface CompletionRequest {
   suffix?: string
   language: string
   filepath?: string
+  /** Phase 5E: neighbour-file context to help multi-line / import-aware predictions */
+  neighbourFiles?: Array<{ path: string; snippet: string }>
+  openTabs?: string[]
+  diagnostics?: string[]
 }
 
 export interface CompletionResponse {

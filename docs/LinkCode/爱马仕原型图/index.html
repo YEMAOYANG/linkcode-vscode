@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1480">
+<title>LinkCode 原型图总览</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: #0a0a0a;
+  color: #ccc;
+  padding: 40px;
+}
+h1 {
+  text-align: center;
+  margin-bottom: 8px;
+  font-size: 32px;
+  background: linear-gradient(135deg, #7c3aed, #5ea2ef);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.subtitle {
+  text-align: center;
+  color: #666;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+/* Category tabs */
+.category-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+.category-tab {
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid #2a2a2a;
+  background: #161616;
+  color: #888;
+  transition: all 0.2s;
+}
+.category-tab:hover { border-color: #7c3aed44; color: #ccc; }
+.category-tab.active {
+  background: linear-gradient(135deg, #7c3aed, #5ea2ef);
+  color: white;
+  border-color: transparent;
+}
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+.card {
+  background: #161616;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #2a2a2a;
+  transition: all 0.3s ease;
+  opacity: 1;
+}
+.card:hover { border-color: #7c3aed44; transform: translateY(-3px); box-shadow: 0 8px 30px rgba(124,58,237,0.1); }
+.card.hidden { display: none; }
+.card-header {
+  padding: 12px 16px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #2a2a2a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-header-left { display: flex; align-items: center; gap: 10px; }
+.card-header h3 { font-size: 14px; font-weight: 600; }
+.card-header .num {
+  background: linear-gradient(135deg, #7c3aed, #5ea2ef);
+  color: white;
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+}
+.card-header .tag {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.tag-core { background: rgba(124,58,237,0.15); color: #9b7dff; }
+.tag-onboard { background: rgba(78,201,176,0.15); color: #4ec9b0; }
+.tag-state { background: rgba(204,167,0,0.15); color: #cca700; }
+.tag-settings { background: rgba(117,190,255,0.15); color: #75beff; }
+.tag-new { background: rgba(241,76,76,0.15); color: #f14c4c; margin-left: 4px; }
+.card iframe {
+  width: 100%;
+  height: 480px;
+  border: none;
+  background: #1e1e1e;
+  pointer-events: none;
+}
+.card.full-width { grid-column: 1 / -1; }
+.card.full-width iframe { height: 540px; }
+a.open-link {
+  color: #7c3aed;
+  font-size: 12px;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+a.open-link:hover { color: #9b7dff; text-decoration: underline; }
+
+.footer {
+  text-align: center;
+  padding: 40px 0 20px;
+  color: #444;
+  font-size: 12px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.card { animation: fadeIn 0.4s ease both; }
+.card:nth-child(1) { animation-delay: 0.02s; }
+.card:nth-child(2) { animation-delay: 0.04s; }
+.card:nth-child(3) { animation-delay: 0.06s; }
+.card:nth-child(4) { animation-delay: 0.08s; }
+.card:nth-child(5) { animation-delay: 0.1s; }
+.card:nth-child(6) { animation-delay: 0.12s; }
+.card:nth-child(7) { animation-delay: 0.14s; }
+.card:nth-child(8) { animation-delay: 0.16s; }
+.card:nth-child(9) { animation-delay: 0.18s; }
+.card:nth-child(10) { animation-delay: 0.2s; }
+.card:nth-child(11) { animation-delay: 0.22s; }
+.card:nth-child(12) { animation-delay: 0.24s; }
+.card:nth-child(13) { animation-delay: 0.26s; }
+
+.stats {
+  display: flex; justify-content: center; gap: 32px;
+  margin-bottom: 32px; padding: 16px;
+  background: #131313; border-radius: 12px;
+  max-width: 600px; margin-left: auto; margin-right: auto;
+  margin-bottom: 32px;
+  border: 1px solid #1e1e1e;
+}
+.stat { text-align: center; }
+.stat .val { font-size: 24px; font-weight: 700; background: linear-gradient(135deg, #7c3aed, #5ea2ef); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.stat .label { font-size: 11px; color: #666; margin-top: 2px; }
+</style>
+</head>
+<body>
+<h1>LinkCode 原型图</h1>
+<p class="subtitle">AI 多模型编程助手 · VS Code 插件 · 高保真交互原型 v2.0</p>
+
+<div class="stats">
+  <div class="stat"><div class="val">13</div><div class="label">原型页面</div></div>
+  <div class="stat"><div class="val">61+</div><div class="label">聚合模型</div></div>
+  <div class="stat"><div class="val">4</div><div class="label">功能分类</div></div>
+  <div class="stat"><div class="val">v2.0</div><div class="label">版本</div></div>
+</div>
+
+<div class="category-tabs">
+  <div class="category-tab active" onclick="filterCards('all')">全部 (13)</div>
+  <div class="category-tab" onclick="filterCards('core')">🧩 核心功能 (6)</div>
+  <div class="category-tab" onclick="filterCards('onboard')">🚀 引导流程 (2)</div>
+  <div class="category-tab" onclick="filterCards('state')">📊 状态管理 (3)</div>
+  <div class="category-tab" onclick="filterCards('settings')">⚙️ 设置 (2)</div>
+</div>
+
+<div class="grid">
+  <!-- 1 -->
+  <div class="card full-width" data-cat="core">
+    <div class="card-header">
+      <div class="card-header-left"><span class="num">1</span><h3>主编辑器 + AI 代码补全</h3><span class="tag tag-core">核心</span></div>
+      <a class="open-link" href="01-editor-completion.html" target="_blank">新窗口打开 ↗</a>
+    </div>
+    <iframe src="01-editor-completion.html" loading="lazy"></iframe>
+  </div>
+  <!-- 2 -->
+  <div class="card full-width" data-cat="core">
+    <div class="card-header">
+      <div class="card-header-left"><span class="num">2</span><h3>侧边栏 Chat 面板</h3><span class="tag tag-core">核心</span></div>
+      <a class="open-link" href="02-chat-panel.html" target="_blank">新窗口打开 ↗</a>
+    </div>
+    <iframe src="02-chat-panel.html" loading="lazy"></iframe>
+  </div>
+  <!-- 3 -->
+  <div class="card full-width" data-cat="core">
+    <div class="card-header">
+      <div class="card-header-left"><span class="num">3</span><h3>Inline Edit（⌘K）</h3><span class="tag tag-core">核心</span></div>
+      <a class="open-link" href="03-inline-edit.html" target="_blank">新窗口打开 ↗</a>
+    </div>
+    <iframe src="03-inline-edit.html" loading="lazy"></iframe>
+  </div>
+  <!-- 4 -->
+  <div class="card" data-cat="core">
+    <div class="card-header">
+      <div class="card-header-left"><span class="num">4</span><h3>模型选择 & 路由设置</h3><span class="tag tag-core">核心</span></div>
+      <a class="open-link" href="04-model-settings.html" target="_blank">新窗口打开 ↗</a>
+    </div>
+    <iframe src="04-model-settings.html" loading="lazy"></iframe>
+  </div>
+  <!-- 5 -->
+  <div class="card" data-cat="core">
+    <div class="card-header">
+      <div class="card-header-left"><span class="num">5</span><h3>Token 使用仪表板</h3><span class="tag tag-core">核心</span></div>
+      <a class="open-link" href="05-token-dashboard.html" target="_blank">新窗口打开 ↗</a>
+    </div>
+    <iframe src="05-token-dashboard.html" loading="lazy"></iframe>
+  </div>
+  <!-- 6 -->
+  <div class="card full-width" data-cat="core">
+    <div class="card-header">
+      <div class="card-header-left"><span class="num">6</span><h3>AI 代码审查</h3><span class="tag tag-core">核心</span></div>
+      <a class="open-link" href="06-code-review.html" target="_blank">新窗口打开 ↗</a>
+    </div>
+    <iframe src="06-code-review.html" loading="lazy"></iframe>
+  </div>
+  <!-- 7 -->
+  <div class="card full-width" data-cat="onboard">
+    <div class="card-header">
+      <div class="card-header-left"><span class="num">7</span><h3>欢迎 / 登录页</h3><span class="tag tag-onboard">引导</span></div>
+      <a class="open-link" href="07-welcome.html" target="_blank">新窗口打开 ↗</a>
+    </div>
+    <iframe src="07-welcome.html" loading="lazy"></iframe>
+  </div>
+  <!-- 8 -->
+  <div class="card full-width" data-cat="settings">
+    <div class="card-header">
+      <div class="card-header-left"><span class="num">8</span><h3>定价页</h3><span class="tag tag-settings">设置</span></div>
+      <a class="open-link" href="08-pricing.html" target="_blank">新窗口打开 ↗</a>
+    </div>
+    <iframe src="08-pricing.html" loading="lazy"></iframe>
+  </div>
+  <!-- 9 NEW -->
+  <div class="card full-width" data-cat="onboard">
+    <div class="card-header">
+      <div class="card-header-left"><span class="num">9</span><h3>新手引导 · 4步流程</h3><span class="tag tag-onboard">引导</span><span class="tag tag-new">新增</span></div>
+      <a class="open-link" href="09-onboarding.html" target="_blank">新窗口打开 ↗</a>
+    </div>
+    <iframe src="09-onboarding.html" loading="lazy"></iframe>
+  </div>
+  <!-- 10 NEW -->
+  <div class="card full-width" data-cat="state">
+    <div class="card-header">
+      <div class="card-header-left"><span class="num">10</span><h3>Chat 面板多状态</h3><span class="tag tag-state">状态</span><span class="tag tag-new">新增</span></div>
+      <a class="open-link" href="10-chat-states.html" target="_blank">新窗口打开 ↗</a>
+    </div>
+    <iframe src="10-chat-states.html" loading="lazy"></iframe>
+  </div>
+  <!-- 11 NEW -->
+  <div class="card full-width" data-cat="state">
+    <div class="card-header">
+      <div class="card-header-left"><span class="num">11</span><h3>Token 预警系统</h3><span class="tag tag-state">状态</span><span class="tag tag-new">新增</span></div>
+      <a class="open-link" href="11-token-warnings.html" target="_blank">新窗口打开 ↗</a>
+    </div>
+    <iframe src="11-token-warnings.html" loading="lazy"></iframe>
+  </div>
+  <!-- 12 NEW -->
+  <div class="card" data-cat="state">
+    <div class="card-header">
+      <div class="card-header-left"><span class="num">12</span><h3>对话历史管理</h3><span class="tag tag-state">状态</span><span class="tag tag-new">新增</span></div>
+      <a class="open-link" href="12-chat-history.html" target="_blank">新窗口打开 ↗</a>
+    </div>
+    <iframe src="12-chat-history.html" loading="lazy"></iframe>
+  </div>
+  <!-- 13 NEW -->
+  <div class="card" data-cat="settings">
+    <div class="card-header">
+      <div class="card-header-left"><span class="num">13</span><h3>扩展设置</h3><span class="tag tag-settings">设置</span><span class="tag tag-new">新增</span></div>
+      <a class="open-link" href="13-settings-extended.html" target="_blank">新窗口打开 ↗</a>
+    </div>
+    <iframe src="13-settings-extended.html" loading="lazy"></iframe>
+  </div>
+</div>
+
+<div class="footer">LinkCode · Powered by Smoothlink.ai · 原型图 v2.0 · 13 个页面 · 品牌色 #7c3aed → #5ea2ef</div>
+
+<script>
+function filterCards(cat) {
+  document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.querySelectorAll('.card').forEach(c => {
+    if (cat === 'all' || c.dataset.cat === cat) {
+      c.classList.remove('hidden');
+    } else {
+      c.classList.add('hidden');
+    }
+  });
+}
+</script>
+</body>
+</html>

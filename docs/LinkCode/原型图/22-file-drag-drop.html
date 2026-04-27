@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode — 拖拽文件上传交互</title>
+<style>
+/* === LinkCode Design Tokens === */
+:root {
+  --bg-app: #0f0f0f;
+  --bg-surface: #141414;
+  --bg-elevated: #1c1c1c;
+  --bg-hover: #232323;
+  --bg-active: #2a2a2a;
+  --bg-border: #2e2e2e;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-subtle: rgba(124,58,237,0.12);
+  --accent-text: #a78bfa;
+  --text-primary: #e2e2e2;
+  --text-secondary: #888888;
+  --text-tertiary: #555555;
+  --green: #22c55e;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --blue: #3b82f6;
+  --font-ui: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-code: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
+  --font-size: 13px;
+  --line-height: 1.5;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  font-family: var(--font-ui);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  color: var(--text-primary);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  width: 100%; height: 100%; overflow: hidden;
+}
+
+/* === VS Code Frame === */
+.vscode-frame {
+  width: 100%; height: 100vh; display: flex; flex-direction: column;
+  background: var(--bg-app); overflow: hidden;
+}
+.vscode-titlebar {
+  height: 36px; background: var(--bg-surface); display: flex; align-items: center;
+  padding: 0 12px; gap: 8px; flex-shrink: 0; border-bottom: 1px solid var(--bg-border);
+}
+.titlebar-dot { width: 12px; height: 12px; border-radius: 50%; }
+.titlebar-dot.close { background: #ff5f57; }
+.titlebar-dot.minimize { background: #ffbd2e; }
+.titlebar-dot.maximize { background: #28c840; }
+.titlebar-title { flex: 1; text-align: center; font-size: 12px; color: var(--text-tertiary); }
+
+.vscode-body { flex: 1; display: flex; overflow: hidden; }
+
+.vscode-sidebar {
+  width: 48px; background: var(--bg-surface); border-right: 1px solid var(--bg-border);
+  display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 4px; flex-shrink: 0;
+}
+.sidebar-icon {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  color: var(--text-tertiary); cursor: pointer; border-radius: var(--radius-sm);
+  transition: all var(--duration-fast) var(--ease);
+}
+.sidebar-icon:hover { color: var(--text-primary); background: var(--bg-hover); }
+.sidebar-icon.active { color: var(--accent-text); }
+
+.vscode-editor {
+  flex: 1; background: var(--bg-app); display: flex; flex-direction: column; overflow: hidden;
+}
+.editor-tabs {
+  display: flex; align-items: center; height: 35px; background: var(--bg-surface);
+  border-bottom: 1px solid var(--bg-border); overflow-x: auto; flex-shrink: 0;
+}
+.editor-tab {
+  display: flex; align-items: center; gap: 6px; padding: 0 16px; height: 100%;
+  font-size: 12px; color: var(--text-secondary); cursor: pointer; border-right: 1px solid var(--bg-border);
+  white-space: nowrap; transition: all var(--duration-fast) var(--ease);
+}
+.editor-tab.active { color: var(--text-primary); background: var(--bg-app); border-bottom: 1px solid var(--accent); }
+.editor-content { flex: 1; overflow: auto; padding: 16px; font-family: var(--font-code); font-size: 12px; line-height: 1.8; color: var(--text-secondary); }
+
+/* === Chat Panel === */
+.vscode-chat {
+  width: 380px; background: var(--bg-surface); border-left: 1px solid var(--bg-border);
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+.chat-header {
+  height: 36px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--bg-border); flex-shrink: 0;
+}
+
+.vscode-statusbar {
+  height: 24px; background: var(--bg-surface); border-top: 1px solid var(--bg-border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 10px;
+  font-size: 11px; flex-shrink: 0;
+}
+.statusbar-left, .statusbar-right { display: flex; align-items: center; gap: 12px; }
+.statusbar-item { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); }
+
+/* === Messages === */
+.messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 0; }
+.message { padding: 12px 0; border-bottom: 1px solid var(--bg-border); }
+.message:last-child { border-bottom: none; }
+.msg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.msg-avatar { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+.msg-avatar.user { background: var(--bg-active); color: var(--text-secondary); }
+.msg-avatar.ai { background: var(--accent-subtle); color: var(--accent-text); }
+.msg-name { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+.msg-body { font-size: 13px; line-height: 1.7; color: var(--text-primary); padding-left: 30px; }
+.msg-body p { margin-bottom: 8px; color: var(--text-primary); }
+
+/* === Chat Input === */
+.chat-input-area { padding: 12px; border-top: 1px solid var(--bg-border); flex-shrink: 0; }
+.chat-input-box {
+  display: flex; align-items: flex-end; gap: 8px; background: var(--bg-elevated);
+  border: 1px solid var(--bg-border); border-radius: var(--radius-lg); padding: 8px 12px;
+  transition: border-color var(--duration-fast) var(--ease);
+  position: relative;
+}
+.chat-input-box textarea {
+  flex: 1; border: none; background: transparent; color: var(--text-primary);
+  font-size: 13px; font-family: var(--font-ui); resize: none; outline: none;
+  min-height: 20px; max-height: 120px; line-height: 1.5;
+}
+.chat-input-box textarea::placeholder { color: var(--text-tertiary); }
+.send-btn {
+  width: 28px; height: 28px; border-radius: var(--radius-sm); background: var(--accent);
+  border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all var(--duration-fast) var(--ease); flex-shrink: 0;
+}
+.send-btn:hover { background: var(--accent-hover); }
+.input-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 6px 0 0; }
+.input-toolbar-left { display: flex; gap: 4px; }
+.input-toolbar-left button {
+  padding: 3px 8px; border: none; background: transparent; color: var(--text-tertiary);
+  font-size: 11px; cursor: pointer; border-radius: var(--radius-sm); transition: all var(--duration-fast);
+  display: flex; align-items: center; gap: 4px;
+}
+.input-toolbar-left button:hover { color: var(--text-secondary); background: var(--bg-hover); }
+.model-selector {
+  display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--accent-text);
+  cursor: pointer; padding: 3px 8px; border-radius: var(--radius-sm);
+}
+
+/* === State Label === */
+.state-label {
+  position: absolute; top: -28px; left: 0;
+  font-size: 10px; font-weight: 600; color: #000;
+  padding: 3px 10px; border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+.state-label.s1 { background: var(--accent-text); }
+.state-label.s2 { background: var(--yellow); }
+.state-label.s3 { background: var(--green); }
+.state-label.s4 { background: var(--blue); color: #fff; }
+.state-label.s5 { background: #22c55e; }
+
+/* === Drag Overlay === */
+.drag-overlay {
+  position: absolute; inset: 0; background: rgba(124,58,237,0.08);
+  border: 2px dashed var(--accent); border-radius: var(--radius-lg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; z-index: 10;
+}
+.drag-overlay .drag-icon { color: var(--accent-text); }
+.drag-overlay .drag-text { font-size: 12px; color: var(--accent-text); font-weight: 500; }
+.drag-overlay .drag-sub { font-size: 10px; color: var(--text-tertiary); }
+
+/* === File Card === */
+.file-card {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-elevated); border: 1px solid var(--bg-border);
+  border-radius: var(--radius-md); padding: 8px 12px;
+  margin-bottom: 8px; position: relative;
+}
+.file-card .file-icon {
+  width: 32px; height: 32px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 14px;
+}
+.file-icon.ts { background: #1e3a5f; color: #60a5fa; }
+.file-icon.py { background: #1f3d2d; color: #4ade80; }
+.file-icon.json { background: #3d2d1f; color: #fb923c; }
+.file-card .file-info { flex: 1; min-width: 0; }
+.file-card .file-name { font-size: 12px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-card .file-meta { font-size: 10px; color: var(--text-tertiary); margin-top: 2px; }
+.file-card .file-remove {
+  width: 20px; height: 20px; border-radius: 50%; border: none;
+  background: transparent; color: var(--text-tertiary); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all var(--duration-fast);
+}
+.file-card .file-remove:hover { background: var(--bg-hover); color: var(--red); }
+
+/* === Progress Bar === */
+.file-progress {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+  background: var(--bg-active); border-radius: 0 0 var(--radius-md) var(--radius-md);
+  overflow: hidden;
+}
+.file-progress-fill {
+  height: 100%; background: var(--accent); border-radius: inherit;
+  animation: progressAnim 2s ease-in-out infinite;
+}
+@keyframes progressAnim {
+  0% { width: 0%; }
+  50% { width: 72%; }
+  100% { width: 100%; }
+}
+
+/* === Attached Badge === */
+.file-attached-badge {
+  font-size: 10px; color: var(--green); display: flex; align-items: center; gap: 3px;
+}
+
+/* === Showcase Layout === */
+.showcase-container {
+  display: flex; flex-direction: column; gap: 48px;
+  padding: 32px 24px; overflow-y: auto; flex: 1;
+}
+.showcase-section { position: relative; }
+.showcase-title {
+  font-size: 11px; font-weight: 600; color: var(--accent-text);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+}
+.showcase-title .num {
+  width: 20px; height: 20px; background: var(--accent-subtle);
+  border-radius: 4px; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: var(--accent); font-weight: 700;
+}
+.showcase-desc {
+  font-size: 11px; color: var(--text-tertiary); margin-bottom: 16px; line-height: 1.6;
+}
+
+/* Chat panel in showcase */
+.demo-chat {
+  width: 380px; background: var(--bg-surface); border: 1px solid var(--bg-border);
+  border-radius: var(--radius-lg); overflow: hidden;
+}
+.demo-chat-header {
+  height: 36px; padding: 0 12px; display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid var(--bg-border);
+}
+.demo-chat-header i { color: var(--accent-text); }
+.demo-chat-header span { font-size: 12px; font-weight: 600; }
+.demo-chat-messages {
+  padding: 12px; min-height: 100px;
+}
+.demo-chat-input {
+  padding: 12px; border-top: 1px solid var(--bg-border); position: relative;
+}
+
+/* === Back Nav === */
+.back-to-index {
+  position: fixed; top: 12px; right: 12px; z-index: 9999;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; background: rgba(28,28,28,0.9);
+  border: 1px solid #2e2e2e; border-radius: 6px;
+  color: #a78bfa; font-size: 11px; font-weight: 500;
+  cursor: pointer; backdrop-filter: blur(8px);
+  transition: all 0.15s var(--ease);
+  text-decoration: none; opacity: 0.7;
+}
+.back-to-index:hover { opacity: 1; border-color: var(--accent); text-decoration: none; }
+
+/* === Page Title === */
+.page-title {
+  padding: 24px 32px 0;
+  font-size: 16px; font-weight: 600; color: var(--text-primary);
+  display: flex; align-items: center; gap: 10px;
+}
+.page-title .tag {
+  font-size: 10px; padding: 2px 8px; border-radius: 4px;
+  background: var(--accent-subtle); color: var(--accent-text); font-weight: 500;
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+</style>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+<div class="vscode-frame">
+  <div class="vscode-titlebar">
+    <div class="titlebar-dot close"></div><div class="titlebar-dot minimize"></div><div class="titlebar-dot maximize"></div>
+    <div class="titlebar-title">LinkCode — 拖拽文件上传交互 · 5 种状态</div><div style="width:36px"></div>
+  </div>
+  <div class="vscode-body">
+    <div class="vscode-sidebar">
+      <div class="sidebar-icon"><i data-lucide="files" style="width:20px;height:20px"></i></div>
+      <div class="sidebar-icon"><i data-lucide="search" style="width:20px;height:20px"></i></div>
+      <div class="sidebar-icon"><i data-lucide="git-branch" style="width:20px;height:20px"></i></div>
+      <div class="sidebar-icon active"><i data-lucide="sparkles" style="width:20px;height:20px"></i></div>
+      <div style="flex:1"></div>
+      <div class="sidebar-icon"><i data-lucide="settings" style="width:20px;height:20px"></i></div>
+    </div>
+
+    <!-- Main content area showing states -->
+    <div class="showcase-container">
+      <div class="page-title">
+        📎 拖拽文件上传交互
+        <span class="tag">5 种状态</span>
+      </div>
+
+      <!-- State 1: Default -->
+      <div class="showcase-section">
+        <div class="showcase-title"><span class="num">1</span> 默认态 — 附件按钮</div>
+        <div class="showcase-desc">聊天输入框下方有「附件」图标按钮，用户可点击或拖拽文件到输入区域</div>
+        <div class="demo-chat">
+          <div class="demo-chat-header">
+            <i data-lucide="sparkles" style="width:14px;height:14px"></i>
+            <span>LinkCode</span>
+          </div>
+          <div class="demo-chat-messages">
+            <div class="message">
+              <div class="msg-header">
+                <div class="msg-avatar ai">✦</div>
+                <span class="msg-name" style="color:var(--accent-text)">LinkCode</span>
+              </div>
+              <div class="msg-body">
+                <p>你好！我可以帮你分析代码文件。你可以将文件拖拽到输入框，或点击附件按钮上传。</p>
+              </div>
+            </div>
+          </div>
+          <div class="demo-chat-input">
+            <div class="chat-input-box">
+              <textarea rows="1" placeholder="输入消息... 支持拖拽文件" readonly></textarea>
+              <button class="send-btn"><i data-lucide="arrow-up" style="width:16px;height:16px"></i></button>
+            </div>
+            <div class="input-toolbar">
+              <div class="input-toolbar-left">
+                <button>
+                  <i data-lucide="at-sign" style="width:12px;height:12px"></i> 引用
+                </button>
+                <button style="color:var(--accent-text);">
+                  <i data-lucide="paperclip" style="width:12px;height:12px"></i> 附件
+                </button>
+                <button>
+                  <i data-lucide="image" style="width:12px;height:12px"></i> 图片
+                </button>
+              </div>
+              <div class="model-selector">
+                <span style="width:14px;height:14px;font-size:7px;font-weight:700;color:#fff;background:#4F46E5;border-radius:3px;display:inline-flex;align-items:center;justify-content:center">DS</span>
+                DeepSeek-V3
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- State 2: Drag Over -->
+      <div class="showcase-section">
+        <div class="showcase-title"><span class="num">2</span> 悬停态（Dragover）— 虚线边框高亮</div>
+        <div class="showcase-desc">当文件拖到输入区上方，整个输入区域出现虚线高亮边框 + 「松手上传文件」提示遮罩</div>
+        <div class="demo-chat">
+          <div class="demo-chat-header">
+            <i data-lucide="sparkles" style="width:14px;height:14px"></i>
+            <span>LinkCode</span>
+          </div>
+          <div class="demo-chat-messages">
+            <div class="message">
+              <div class="msg-header">
+                <div class="msg-avatar ai">✦</div>
+                <span class="msg-name" style="color:var(--accent-text)">LinkCode</span>
+              </div>
+              <div class="msg-body">
+                <p>你好！我可以帮你分析代码文件。</p>
+              </div>
+            </div>
+          </div>
+          <div class="demo-chat-input" style="position:relative;">
+            <div class="chat-input-box" style="border-color:var(--accent);min-height:80px;">
+              <div class="drag-overlay">
+                <i data-lucide="upload-cloud" style="width:28px;height:28px" class="drag-icon"></i>
+                <span class="drag-text">松手上传文件</span>
+                <span class="drag-sub">支持 .ts .js .py .json .md 等代码文件</span>
+              </div>
+              <textarea rows="1" placeholder="输入消息..." readonly style="opacity:0.3"></textarea>
+            </div>
+            <div class="input-toolbar" style="opacity:0.3">
+              <div class="input-toolbar-left">
+                <button><i data-lucide="at-sign" style="width:12px;height:12px"></i> 引用</button>
+                <button><i data-lucide="paperclip" style="width:12px;height:12px"></i> 附件</button>
+              </div>
+              <div class="model-selector">DeepSeek-V3</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- State 3: File Placed (Preview Card) -->
+      <div class="showcase-section">
+        <div class="showcase-title"><span class="num">3</span> 放置成功态 — 文件预览卡片</div>
+        <div class="showcase-desc">文件被放置后，输入框上方显示文件预览卡片（文件名 + 大小 + 类型图标 + 删除按钮）</div>
+        <div class="demo-chat">
+          <div class="demo-chat-header">
+            <i data-lucide="sparkles" style="width:14px;height:14px"></i>
+            <span>LinkCode</span>
+          </div>
+          <div class="demo-chat-messages">
+            <div class="message">
+              <div class="msg-header">
+                <div class="msg-avatar ai">✦</div>
+                <span class="msg-name" style="color:var(--accent-text)">LinkCode</span>
+              </div>
+              <div class="msg-body">
+                <p>你好！我可以帮你分析代码文件。</p>
+              </div>
+            </div>
+          </div>
+          <div class="demo-chat-input">
+            <div style="margin-bottom: 8px;">
+              <div class="file-card" style="animation: slideUp 0.3s var(--ease);">
+                <div class="file-icon ts">
+                  <i data-lucide="file-code" style="width:16px;height:16px"></i>
+                </div>
+                <div class="file-info">
+                  <div class="file-name">useDebounce.ts</div>
+                  <div class="file-meta">TypeScript · 2.3 KB</div>
+                </div>
+                <button class="file-remove" title="移除文件"><i data-lucide="x" style="width:12px;height:12px"></i></button>
+              </div>
+              <div class="file-card" style="animation: slideUp 0.3s var(--ease) 0.05s both;">
+                <div class="file-icon json">
+                  <i data-lucide="file-json" style="width:16px;height:16px"></i>
+                </div>
+                <div class="file-info">
+                  <div class="file-name">package.json</div>
+                  <div class="file-meta">JSON · 1.8 KB</div>
+                </div>
+                <button class="file-remove" title="移除文件"><i data-lucide="x" style="width:12px;height:12px"></i></button>
+              </div>
+            </div>
+            <div class="chat-input-box">
+              <textarea rows="1" placeholder="输入消息，描述你想对这些文件做什么..." readonly></textarea>
+              <button class="send-btn"><i data-lucide="arrow-up" style="width:16px;height:16px"></i></button>
+            </div>
+            <div class="input-toolbar">
+              <div class="input-toolbar-left">
+                <button><i data-lucide="at-sign" style="width:12px;height:12px"></i> 引用</button>
+                <button style="color:var(--accent-text)"><i data-lucide="paperclip" style="width:12px;height:12px"></i> 附件</button>
+              </div>
+              <div class="model-selector">
+                <span style="width:14px;height:14px;font-size:7px;font-weight:700;color:#fff;background:#4F46E5;border-radius:3px;display:inline-flex;align-items:center;justify-content:center">DS</span>
+                DeepSeek-V3
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- State 4: Uploading (Progress Bar) -->
+      <div class="showcase-section">
+        <div class="showcase-title"><span class="num">4</span> 上传中态 — 进度条动画</div>
+        <div class="showcase-desc">文件正在上传时，卡片内显示进度条动画和上传百分比</div>
+        <div class="demo-chat">
+          <div class="demo-chat-header">
+            <i data-lucide="sparkles" style="width:14px;height:14px"></i>
+            <span>LinkCode</span>
+          </div>
+          <div class="demo-chat-messages">
+            <div class="message">
+              <div class="msg-header">
+                <div class="msg-avatar ai">✦</div>
+                <span class="msg-name" style="color:var(--accent-text)">LinkCode</span>
+              </div>
+              <div class="msg-body">
+                <p>你好！我可以帮你分析代码文件。</p>
+              </div>
+            </div>
+          </div>
+          <div class="demo-chat-input">
+            <div style="margin-bottom: 8px;">
+              <div class="file-card" style="border-color: rgba(124,58,237,0.3);">
+                <div class="file-icon ts" style="opacity:0.7">
+                  <i data-lucide="file-code" style="width:16px;height:16px"></i>
+                </div>
+                <div class="file-info">
+                  <div class="file-name">useDebounce.ts</div>
+                  <div class="file-meta" style="color:var(--accent-text);">
+                    <i data-lucide="loader" style="width:10px;height:10px;display:inline-block;animation:spin 1s linear infinite"></i>
+                    上传中 72%
+                  </div>
+                </div>
+                <div class="file-progress">
+                  <div class="file-progress-fill"></div>
+                </div>
+              </div>
+              <div class="file-card" style="opacity:0.5;">
+                <div class="file-icon json">
+                  <i data-lucide="file-json" style="width:16px;height:16px"></i>
+                </div>
+                <div class="file-info">
+                  <div class="file-name">package.json</div>
+                  <div class="file-meta">等待上传...</div>
+                </div>
+              </div>
+            </div>
+            <div class="chat-input-box" style="opacity:0.6;pointer-events:none;">
+              <textarea rows="1" placeholder="文件上传中，请稍候..." readonly></textarea>
+              <button class="send-btn" style="opacity:0.4"><i data-lucide="arrow-up" style="width:16px;height:16px"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- State 5: Complete (Attached) -->
+      <div class="showcase-section" style="padding-bottom:48px;">
+        <div class="showcase-title"><span class="num">5</span> 完成态 — 已附加，可发送</div>
+        <div class="showcase-desc">文件上传完成，卡片变为已附加状态，用户可以附带消息一起发送</div>
+        <div class="demo-chat">
+          <div class="demo-chat-header">
+            <i data-lucide="sparkles" style="width:14px;height:14px"></i>
+            <span>LinkCode</span>
+          </div>
+          <div class="demo-chat-messages">
+            <div class="message">
+              <div class="msg-header">
+                <div class="msg-avatar ai">✦</div>
+                <span class="msg-name" style="color:var(--accent-text)">LinkCode</span>
+              </div>
+              <div class="msg-body">
+                <p>你好！我可以帮你分析代码文件。</p>
+              </div>
+            </div>
+          </div>
+          <div class="demo-chat-input">
+            <div style="margin-bottom: 8px;">
+              <div class="file-card" style="border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.04);">
+                <div class="file-icon ts">
+                  <i data-lucide="file-code" style="width:16px;height:16px"></i>
+                </div>
+                <div class="file-info">
+                  <div class="file-name">useDebounce.ts</div>
+                  <div class="file-meta">
+                    <span class="file-attached-badge">
+                      <i data-lucide="check-circle" style="width:10px;height:10px"></i>
+                      已附加 · 2.3 KB
+                    </span>
+                  </div>
+                </div>
+                <button class="file-remove" title="移除文件"><i data-lucide="x" style="width:12px;height:12px"></i></button>
+              </div>
+              <div class="file-card" style="border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.04);">
+                <div class="file-icon json">
+                  <i data-lucide="file-json" style="width:16px;height:16px"></i>
+                </div>
+                <div class="file-info">
+                  <div class="file-name">package.json</div>
+                  <div class="file-meta">
+                    <span class="file-attached-badge">
+                      <i data-lucide="check-circle" style="width:10px;height:10px"></i>
+                      已附加 · 1.8 KB
+                    </span>
+                  </div>
+                </div>
+                <button class="file-remove" title="移除文件"><i data-lucide="x" style="width:12px;height:12px"></i></button>
+              </div>
+            </div>
+            <div class="chat-input-box" style="border-color:var(--accent);">
+              <textarea rows="1" readonly style="color:var(--text-primary);">帮我优化这个 useDebounce hook，加上 cancel 功能</textarea>
+              <button class="send-btn" style="background:var(--green)"><i data-lucide="arrow-up" style="width:16px;height:16px"></i></button>
+            </div>
+            <div class="input-toolbar">
+              <div class="input-toolbar-left">
+                <button><i data-lucide="at-sign" style="width:12px;height:12px"></i> 引用</button>
+                <button style="color:var(--accent-text)"><i data-lucide="paperclip" style="width:12px;height:12px"></i> 附件</button>
+              </div>
+              <div class="model-selector">
+                <span style="width:14px;height:14px;font-size:7px;font-weight:700;color:#fff;background:#4F46E5;border-radius:3px;display:inline-flex;align-items:center;justify-content:center">DS</span>
+                DeepSeek-V3
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /showcase-container -->
+  </div><!-- /vscode-body -->
+  <div class="vscode-statusbar">
+    <div class="statusbar-left">
+      <span class="statusbar-item"><i data-lucide="git-branch" style="width:12px;height:12px"></i> main</span>
+      <span class="statusbar-item">TypeScript</span>
+    </div>
+    <div class="statusbar-right">
+      <span class="statusbar-item" style="color:var(--green)">⚡ ¥38.48 余额</span>
+    </div>
+  </div>
+</div>
+
+<a href="index.html" class="back-to-index">
+  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+  导航页
+</a>
+
+<style>
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+});
+</script>
+</body>
+</html>

@@ -1,6 +1,12 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useVSCode } from './useVSCode'
 
+/**
+ * Cursor-style chat mode. Mirrors `ChatMode` in `src/shared/types.ts`.
+ * Webview keeps its own copy to stay decoupled from the extension build.
+ */
+export type ChatMode = 'ask' | 'agent' | 'plan'
+
 export interface SessionStats {
   totalTokens: number
   promptTokens: number
@@ -16,6 +22,7 @@ export interface ChatMsg {
   cost?: string
   savings?: string
   tokenCount?: number
+  mode?: ChatMode
 }
 
 export interface ModelInfo {
@@ -34,18 +41,6 @@ export interface PricingItemWeb {
   quota_type?: number
 }
 
-/** Fallback model list matching RECOMMENDED_MODELS in constants */
-const FALLBACK_MODELS: ModelInfo[] = [
-  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'Anthropic', tag: '推荐' },
-  { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'Anthropic', tag: '最强推理' },
-  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', provider: 'Anthropic', tag: '最快' },
-  { id: 'deepseek-r1', label: 'DeepSeek R1', provider: 'DeepSeek', tag: '强推理' },
-  { id: 'deepseek-v3', label: 'DeepSeek V3', provider: 'DeepSeek', tag: '性价比' },
-  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', provider: 'Google', tag: '长上下文' },
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Google', tag: '快速' },
-  { id: 'gpt-5', label: 'GPT-5', provider: 'OpenAI' },
-]
-
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
@@ -54,7 +49,8 @@ export function useChat() {
   const messages = ref<ChatMsg[]>([])
   const isLoading = ref(false)
   const currentModel = ref('claude-sonnet-4-6')
-  const models = ref<ModelInfo[]>(FALLBACK_MODELS)
+  const currentMode = ref<ChatMode>('ask')
+  const models = ref<ModelInfo[]>([])
   const modelsLoading = ref(true)
   const sessionStats = ref<SessionStats>({
     totalTokens: 0,
@@ -102,7 +98,10 @@ export function useChat() {
         case 'loadHistory':
           // Restore history from extension globalState
           if (msg.messages && Array.isArray(msg.messages)) {
-            messages.value = msg.messages
+            messages.value = msg.messages.map((m) => ({
+              ...m,
+              mode: m.mode ?? 'ask',
+            }))
             historyLoaded = true
           }
           break
@@ -120,6 +119,20 @@ export function useChat() {
           }
           break
 
+        case 'modelListMerge': {
+          // Phase 2: merge newly-validated group models into existing list, dedup by id
+          if (msg.models && Array.isArray(msg.models)) {
+            const existingIds = new Set(models.value.map((m) => m.id))
+            const incoming = msg.models as ModelInfo[]
+            const toAdd = incoming.filter((m) => !existingIds.has(m.id))
+            if (toAdd.length > 0) {
+              models.value = [...models.value, ...toAdd]
+            }
+            modelsLoading.value = false
+          }
+          break
+        }
+
         case 'pricingData':
           if (msg.models && Array.isArray(msg.models)) {
             pricingData.value = msg.models as PricingItemWeb[]
@@ -135,15 +148,27 @@ export function useChat() {
 
         case 'stream_start':
           // Extension is about to stream — create an empty assistant bubble
+          // Snapshot the currently-active mode so ChatMessage can render
+          // mode-specific affordances (e.g. PlanActions) when it finishes.
           isLoading.value = true
-          messages.value.push({ id: generateId(), role: 'assistant', content: '' })
+          messages.value.push({
+            id: generateId(),
+            role: 'assistant',
+            content: '',
+            mode: currentMode.value,
+          })
           break
 
         case 'stream_chunk': {
           // Append token to the last assistant message
           const lastMsg = messages.value[messages.value.length - 1]
           if (!lastMsg || lastMsg.role !== 'assistant') {
-            messages.value.push({ id: generateId(), role: 'assistant', content: '' })
+            messages.value.push({
+              id: generateId(),
+              role: 'assistant',
+              content: '',
+              mode: currentMode.value,
+            })
           }
           const current = messages.value[messages.value.length - 1]
           current.content += msg.content ?? ''
@@ -213,8 +238,14 @@ export function useChat() {
     { deep: true }
   )
 
-  function sendMessage(text: string) {
-    messages.value.push({ id: generateId(), role: 'user', content: text })
+  function sendMessage(text: string, mode?: ChatMode) {
+    const effectiveMode: ChatMode = mode ?? currentMode.value
+    messages.value.push({
+      id: generateId(),
+      role: 'user',
+      content: text,
+      mode: effectiveMode,
+    })
     isLoading.value = true
   }
 
@@ -226,10 +257,15 @@ export function useChat() {
     currentModel.value = modelId
   }
 
+  function setMode(mode: ChatMode) {
+    currentMode.value = mode
+  }
+
   return {
     messages,
     isLoading,
     currentModel,
+    currentMode,
     models,
     modelsLoading,
     sessionStats,
@@ -238,5 +274,6 @@ export function useChat() {
     sendMessage,
     clearMessages,
     changeModel,
+    setMode,
   }
 }

@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode - 欢迎页</title>
+<link rel="stylesheet" href="shared-styles.css">
+<style>
+body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.welcome-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 40px;
+  background: radial-gradient(ellipse at 50% 0%, rgba(124,92,252,0.08) 0%, transparent 60%);
+}
+.welcome-logo { margin-bottom: 20px; }
+.welcome-logo svg { width: 64px; height: 64px; filter: drop-shadow(0 4px 20px rgba(124,92,252,0.3)); }
+.welcome-title {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.welcome-subtitle {
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin-bottom: 36px;
+  text-align: center;
+  line-height: 1.6;
+}
+.welcome-login {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 28px 36px;
+  width: 420px;
+  margin-bottom: 36px;
+}
+.welcome-login h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 16px;
+  text-align: center;
+}
+.login-field { margin-bottom: 12px; }
+.login-field label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.login-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: var(--accent-gradient);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: opacity 0.15s;
+}
+.login-btn:hover { opacity: 0.9; }
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.login-divider::before, .login-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.oauth-btns { display: flex; gap: 10px; }
+.oauth-btn {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: border-color 0.15s;
+}
+.oauth-btn:hover { border-color: var(--border-light); }
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  width: 100%;
+  max-width: 800px;
+  margin-bottom: 32px;
+}
+.feature-card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.feature-card:hover { border-color: rgba(124,92,252,0.3); transform: translateY(-2px); }
+.feature-icon { font-size: 28px; margin-bottom: 10px; }
+.feature-title { font-size: 14px; font-weight: 600; color: var(--text-bright); margin-bottom: 4px; }
+.feature-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.shortcuts-section {
+  width: 100%;
+  max-width: 800px;
+}
+.shortcuts-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 12px;
+}
+.shortcut-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+}
+.shortcut-item .name { color: var(--text-secondary); }
+.shortcut-item kbd {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: 'Inter', sans-serif;
+  color: var(--text-primary);
+}
+.version-info {
+  margin-top: 32px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+</style>
+</head>
+<body>
+<div class="macos-window">
+  <div class="titlebar">
+    <div class="traffic-lights"><span class="tl-close"></span><span class="tl-minimize"></span><span class="tl-maximize"></span></div>
+    <div class="titlebar-text">欢迎使用 LinkCode</div>
+  </div>
+  <div class="vscode-layout">
+    <div class="activity-bar">
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7v10l4-3V10L3 7zm0 0l9-4 9 4M12 3v18m0 0l9-4V7"/></svg></div>
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg></div>
+      <div class="activity-icon active">
+        <svg viewBox="0 0 24 24" fill="none"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#5ea2ef"/></linearGradient></defs><path d="M12 2L2 7l10 5 10-5-10-5z" fill="url(#lg)" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="url(#lg)" stroke-width="1.5" fill="none"/></svg>
+      </div>
+      <div class="activity-spacer"></div>
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4"/></svg></div>
+    </div>
+    <div class="editor-area">
+      <div class="tab-bar">
+        <div class="tab active">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="#7c3aed" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="#7c3aed" stroke-width="1.5" fill="none"/></svg>
+          欢迎
+          <span class="tab-close">×</span>
+        </div>
+      </div>
+      <div class="welcome-content">
+        <div class="welcome-logo">
+          <svg viewBox="0 0 64 64" fill="none">
+            <defs>
+              <linearGradient id="wlg" x1="0" y1="0" x2="64" y2="64">
+                <stop offset="0%" stop-color="#7c3aed"/>
+                <stop offset="100%" stop-color="#5ea2ef"/>
+              </linearGradient>
+            </defs>
+            <rect width="64" height="64" rx="16" fill="#1a1a2e"/>
+            <path d="M32 12L12 22l20 10 20-10-20-10z" fill="url(#wlg)" opacity="0.9"/>
+            <path d="M12 42l20 10 20-10M12 32l20 10 20-10" stroke="url(#wlg)" stroke-width="2.5" fill="none"/>
+          </svg>
+        </div>
+        <div class="welcome-title">欢迎使用 LinkCode</div>
+        <div class="welcome-subtitle">
+          AI 多模型编程助手 · 61+ 个模型 · 比 Cursor 便宜 73%<br>
+          基于 Smoothlink.ai，国产模型优先，数据不出境，无需翻墙
+        </div>
+
+        <!-- Login Card -->
+        <div class="welcome-login">
+          <h3>登录 Smoothlink 账户</h3>
+          <div class="login-field">
+            <label>邮箱</label>
+            <input class="input" type="email" placeholder="your@email.com" />
+          </div>
+          <div class="login-field">
+            <label>密码</label>
+            <input class="input" type="password" placeholder="••••••••" />
+          </div>
+          <button class="login-btn">🚀 登录并开始使用</button>
+          <div class="login-divider">或</div>
+          <div class="oauth-btns">
+            <button class="oauth-btn">🐙 GitHub 登录</button>
+            <button class="oauth-btn">💬 微信登录</button>
+            <button class="oauth-btn">📱 手机号登录</button>
+          </div>
+          <div style="text-align:center;margin-top:12px;">
+            <a href="#" style="color:var(--accent-light);font-size:12px;text-decoration:none;">还没有账户？免费注册 →</a>
+          </div>
+        </div>
+
+        <!-- Features -->
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <div class="feature-title">智能代码补全</div>
+            <div class="feature-desc">Tab 键即刻补全，Ghost Text 实时预览，代码自动流淌</div>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">💬</div>
+            <div class="feature-title">AI 对话面板</div>
+            <div class="feature-desc">侧边栏 Chat，支持 @file/@workspace 上下文引用</div>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">✏️</div>
+            <div class="feature-title">Inline Edit</div>
+            <div class="feature-desc">⌘K 唤起浮动编辑框，Diff 视图预览修改</div>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🧠</div>
+            <div class="feature-title">智能路由</div>
+            <div class="feature-desc">自动选择最优模型，降低 40%+ Token 成本</div>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🔍</div>
+            <div class="feature-title">AI 代码审查</div>
+            <div class="feature-desc">Git Diff 一键审查，智能发现潜在问题</div>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🛡️</div>
+            <div class="feature-title">数据安全</div>
+            <div class="feature-desc">国产模型优先，数据不出境，合规安心</div>
+          </div>
+        </div>
+
+        <!-- Shortcuts -->
+        <div class="shortcuts-section">
+          <h3>⌨️ 快捷键</h3>
+          <div class="shortcut-list">
+            <div class="shortcut-item"><span class="name">接受补全</span><kbd>Tab</kbd></div>
+            <div class="shortcut-item"><span class="name">取消补全</span><kbd>Esc</kbd></div>
+            <div class="shortcut-item"><span class="name">打开对话面板</span><kbd>⌘ Shift L</kbd></div>
+            <div class="shortcut-item"><span class="name">Inline Edit</span><kbd>⌘ K</kbd></div>
+            <div class="shortcut-item"><span class="name">AI 代码审查</span><kbd>⌘ Shift R</kbd></div>
+            <div class="shortcut-item"><span class="name">切换模型</span><kbd>⌘ Shift M</kbd></div>
+          </div>
+        </div>
+
+        <div class="version-info">
+          LinkCode v1.0.0 · Powered by Smoothlink.ai · 61+ 模型
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div class="status-accent"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.5" fill="none"/></svg> LinkCode</div>
+    <div class="status-bar-left"><div class="status-item" style="color:var(--warning);">⚠ 未登录</div></div>
+    <div class="status-bar-right"><div class="status-item">v1.0.0</div></div>
+  </div>
+</div>
+<script>
+// Form validation
+document.querySelectorAll('.input, input[type="text"], input[type="password"]').forEach(input => {
+  input.addEventListener('focus', () => {
+    input.style.borderColor = 'var(--accent)';
+  });
+  input.addEventListener('blur', () => {
+    input.style.borderColor = '';
+    if (input.value && input.value.length > 2) {
+      input.style.borderColor = 'var(--green)';
+    }
+  });
+});
+
+// Button loading state
+document.querySelectorAll('.btn-primary').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    if (btn.classList.contains('loading')) return;
+    const orig = btn.innerHTML;
+    btn.classList.add('loading');
+    btn.innerHTML = '<span style="animation:spin 1s linear infinite;display:inline-block;">⏳</span> 处理中...';
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.innerHTML = '✅ 成功';
+      btn.style.background = 'var(--green)';
+      setTimeout(() => {
+        btn.innerHTML = orig;
+        btn.style.background = '';
+        btn.disabled = false;
+        btn.classList.remove('loading');
+      }, 1500);
+    }, 1500);
+  });
+});
+
+// OAuth buttons hover
+document.querySelectorAll('[class*="oauth"], [class*="login"]').forEach(btn => {
+  btn.style.transition = 'all 0.2s ease';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode - Chat 面板多状态</title>
+<link rel="stylesheet" href="shared-styles.css">
+<style>
+body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.states-grid {
+  flex: 1; overflow-y: auto; padding: 28px 36px;
+}
+.states-grid h1 { font-size: 22px; font-weight: 700; color: var(--text-bright); margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+.states-grid .sub { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+.state-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.state-panel {
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.state-panel-header {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg-tertiary);
+}
+.state-panel-body {
+  height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Empty State */
+.empty-state {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding: 24px;
+}
+.empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.6; }
+.empty-title { font-size: 16px; color: var(--text-bright); margin-bottom: 6px; font-weight: 600; }
+.empty-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 20px; text-align: center; }
+.quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+.quick-action {
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-primary);
+}
+.quick-action:hover { border-color: var(--accent); background: rgba(124,58,237,0.08); transform: translateY(-1px); }
+.quick-action:active { transform: translateY(0); }
+.quick-action .qa-icon { font-size: 16px; }
+
+/* Loading State */
+.loading-state {
+  flex: 1; display: flex; flex-direction: column; padding: 16px;
+}
+.msg-user-simple {
+  align-self: flex-end;
+  background: var(--accent);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 12px 12px 4px 12px;
+  font-size: 13px;
+  max-width: 85%;
+  margin-bottom: 16px;
+}
+.thinking-indicator {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 0;
+}
+.thinking-avatar {
+  width: 24px; height: 24px; border-radius: 6px;
+  background: var(--accent-gradient);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.thinking-avatar svg { width: 14px; height: 14px; }
+.thinking-text { font-size: 12px; color: var(--text-muted); }
+.thinking-dots { display: flex; gap: 4px; margin-left: 4px; }
+.thinking-dots span {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  animation: bounce 1.2s ease-in-out infinite;
+}
+.thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.3s; }
+.skeleton-lines { margin-top: 8px; padding-left: 34px; }
+.skeleton-line {
+  height: 12px; margin-bottom: 8px; border-radius: 4px;
+  background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-hover) 50%, var(--bg-tertiary) 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Error State */
+.error-state {
+  flex: 1; display: flex; flex-direction: column; padding: 16px;
+}
+.error-card {
+  background: var(--red-bg);
+  border: 1px solid rgba(241,76,76,0.3);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-top: 12px;
+  animation: fadeIn 0.3s ease;
+}
+.error-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.error-card-header .icon { color: var(--red); font-size: 18px; }
+.error-card-header .title { font-size: 14px; font-weight: 600; color: var(--red); }
+.error-card p { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5; }
+.error-card-actions { display: flex; gap: 8px; }
+
+/* Token Exhausted State */
+.exhausted-state {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 20px;
+}
+.exhausted-icon { font-size: 40px; margin-bottom: 12px; }
+.exhausted-title { font-size: 16px; color: var(--text-bright); font-weight: 600; margin-bottom: 4px; }
+.exhausted-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; text-align: center; }
+.upgrade-card {
+  background: rgba(124,58,237,0.08);
+  border: 1px solid rgba(124,58,237,0.3);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  width: 100%;
+}
+.upgrade-card h4 { font-size: 14px; color: var(--accent-light); margin-bottom: 10px; font-weight: 600; }
+.plan-compare { display: flex; gap: 12px; margin-bottom: 12px; }
+.plan-item {
+  flex: 1; padding: 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+.plan-item.pro {
+  border-color: var(--accent);
+  background: rgba(124,58,237,0.1);
+}
+.plan-item .name { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.plan-item .price { font-size: 18px; font-weight: 700; color: var(--text-bright); }
+.plan-item.pro .price { color: var(--accent-light); }
+.plan-item .detail { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+/* Shared: Chat Input Bar */
+.mini-chat-input {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-sidebar);
+}
+.mini-input-box {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.mini-send {
+  width: 22px; height: 22px; border-radius: 4px;
+  background: var(--accent-gradient);
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.mini-send svg { width: 12px; height: 12px; }
+
+.state-tag {
+  padding: 2px 6px; border-radius: 3px;
+  font-size: 10px; font-weight: 600;
+}
+.state-tag.empty { background: rgba(117,190,255,0.15); color: var(--info); }
+.state-tag.loading { background: rgba(124,58,237,0.15); color: var(--accent-light); }
+.state-tag.error { background: var(--red-bg); color: var(--red); }
+.state-tag.exhausted { background: rgba(204,167,0,0.15); color: var(--warning); }
+</style>
+</head>
+<body>
+<div class="macos-window">
+  <div class="titlebar">
+    <div class="traffic-lights"><span class="tl-close"></span><span class="tl-minimize"></span><span class="tl-maximize"></span></div>
+    <div class="titlebar-text">Chat 面板多状态 — LinkCode</div>
+  </div>
+  <div class="vscode-layout">
+    <div class="activity-bar">
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7v10l4-3V10L3 7zm0 0l9-4 9 4M12 3v18m0 0l9-4V7"/></svg></div>
+      <div class="activity-icon active" title="LinkCode AI">
+        <svg viewBox="0 0 24 24" fill="none"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#5ea2ef"/></linearGradient></defs><path d="M12 2L2 7l10 5 10-5-10-5z" fill="url(#lg)" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="url(#lg)" stroke-width="1.5" fill="none"/></svg>
+      </div>
+      <div class="activity-spacer"></div>
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4m-8.66-2.34l2.83-2.83m11.66-5.66l2.83-2.83M1 12h4m14 0h4"/></svg></div>
+    </div>
+
+    <div class="states-grid">
+      <h1>💬 Chat 面板多状态</h1>
+      <p class="sub">展示 Chat 面板的 4 种关键状态，确保所有边界情况都有对应的 UI 设计</p>
+
+      <div class="state-panels">
+        <!-- Empty State -->
+        <div class="state-panel">
+          <div class="state-panel-header"><span class="state-tag empty">空状态</span> 新对话 · 无消息</div>
+          <div class="state-panel-body">
+            <div class="empty-state">
+              <div class="empty-icon">✨</div>
+              <div class="empty-title">开始和 AI 对话</div>
+              <div class="empty-desc">选择一个快捷操作，或直接输入你的问题</div>
+              <div class="quick-actions">
+                <div class="quick-action" onclick="this.style.borderColor='var(--accent)'"><span class="qa-icon">🐛</span> 找 Bug</div>
+                <div class="quick-action" onclick="this.style.borderColor='var(--accent)'"><span class="qa-icon">📝</span> 写测试</div>
+                <div class="quick-action" onclick="this.style.borderColor='var(--accent)'"><span class="qa-icon">🔄</span> 重构代码</div>
+                <div class="quick-action" onclick="this.style.borderColor='var(--accent)'"><span class="qa-icon">📖</span> 解释代码</div>
+              </div>
+              <div style="margin-top:14px;font-size:11px;color:var(--text-muted);">
+                💡 试试 <kbd style="background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-size:10px;">@file</kbd> 引用文件
+                · <kbd style="background:var(--bg-input);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-size:10px;">Ctrl+I</kbd> 引用选中代码
+              </div>
+            </div>
+            <div class="mini-chat-input">
+              <div class="mini-input-box">
+                <span>输入消息... (⌘Enter 发送)</span>
+                <button class="mini-send"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="white" stroke-width="2" stroke-linecap="round"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loading State -->
+        <div class="state-panel">
+          <div class="state-panel-header"><span class="state-tag loading">加载中</span> AI 正在思考</div>
+          <div class="state-panel-body">
+            <div class="loading-state">
+              <div class="msg-user-simple">帮我优化这个函数的性能，当前处理 10 万条数据需要 3 秒</div>
+              <div class="thinking-indicator">
+                <div class="thinking-avatar"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.5" fill="none"/></svg></div>
+                <span class="thinking-text">DeepSeek-V3 正在思考</span>
+                <div class="thinking-dots"><span></span><span></span><span></span></div>
+              </div>
+              <div class="skeleton-lines">
+                <div class="skeleton-line" style="width:90%"></div>
+                <div class="skeleton-line" style="width:75%"></div>
+                <div class="skeleton-line" style="width:85%"></div>
+                <div class="skeleton-line" style="width:60%"></div>
+              </div>
+            </div>
+            <div class="mini-chat-input">
+              <div class="mini-input-box" style="opacity:0.5;">
+                <span>等待回复中...</span>
+                <button class="mini-send" style="opacity:0.3;" disabled><svg viewBox="0 0 24 24" fill="none"><path d="M6 18L18 6M6 6l12 12" stroke="white" stroke-width="2" stroke-linecap="round"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error State -->
+        <div class="state-panel">
+          <div class="state-panel-header"><span class="state-tag error">错误</span> API 调用失败</div>
+          <div class="state-panel-body">
+            <div class="error-state">
+              <div class="msg-user-simple">帮我重构这段代码，使用策略模式</div>
+              <div class="error-card">
+                <div class="error-card-header">
+                  <span class="icon">⚠️</span>
+                  <span class="title">请求失败</span>
+                </div>
+                <p>Claude Sonnet API 返回错误 (429)：请求频率超限，请稍后重试或切换到其他模型。</p>
+                <div class="error-card-actions">
+                  <button class="btn btn-primary btn-sm" onclick="this.textContent='重试中...';this.disabled=true;setTimeout(()=>{this.textContent='🔄 重试';this.disabled=false;},1500)">🔄 重试</button>
+                  <button class="btn btn-secondary btn-sm" onclick="this.textContent='✅ 已切换到 DeepSeek-V3'">🔀 切换模型</button>
+                </div>
+              </div>
+            </div>
+            <div class="mini-chat-input">
+              <div class="mini-input-box">
+                <span>输入消息... (⌘Enter 发送)</span>
+                <button class="mini-send"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="white" stroke-width="2" stroke-linecap="round"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Token Exhausted -->
+        <div class="state-panel">
+          <div class="state-panel-header"><span class="state-tag exhausted">耗尽</span> Token 额度用完</div>
+          <div class="state-panel-body">
+            <div class="exhausted-state">
+              <div class="exhausted-icon">🪫</div>
+              <div class="exhausted-title">免费额度已用完</div>
+              <div class="exhausted-desc">本月免费额度（¥5.00）已用完<br>升级 Pro 解锁更多额度</div>
+              <div class="upgrade-card">
+                <h4>⚡ 升级对比</h4>
+                <div class="plan-compare">
+                  <div class="plan-item">
+                    <div class="name">Free</div>
+                    <div class="price">¥5</div>
+                    <div class="detail">/ 月</div>
+                  </div>
+                  <div class="plan-item pro">
+                    <div class="name">Pro</div>
+                    <div class="price">¥99</div>
+                    <div class="detail">/ 月 · 无限制</div>
+                  </div>
+                </div>
+                <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="this.textContent='🎉 正在跳转...'">升级 Pro →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div class="status-accent">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.5" fill="none"/></svg>
+      LinkCode
+    </div>
+    <div class="status-bar-left">
+      <div class="status-item"><span style="width:6px;height:6px;border-radius:50%;background:#4ec9b0;display:inline-block;"></span> DeepSeek-V3</div>
+      <div class="status-item">⚡ 自动路由</div>
+      <div class="status-item">🪙 ¥12.50</div>
+    </div>
+    <div class="status-bar-right">
+      <div class="status-item">Chat 状态演示</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -13,12 +13,21 @@ export interface CodeContext {
 }
 
 /**
+ * Cursor-style chat interaction mode.
+ * - ask: Q&A only, AI must not modify files
+ * - agent: AI emits applicable code fences which are auto-applied as inline diff
+ * - plan: AI emits a markdown plan document; Build button converts it to Agent run
+ */
+export type ChatMode = 'ask' | 'agent' | 'plan'
+
+/**
  * Stored chat message shape (shared between extension host and webview).
  */
 export interface StoredChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
+  mode?: ChatMode
 }
 
 /**
@@ -65,6 +74,7 @@ export type ExtToWebMsg =
   | { type: 'loadHistory'; messages: StoredChatMessage[] }
   | { type: 'modelInfo'; modelId: string }
   | { type: 'modelList'; models: ApiModelInfo[] }
+  | { type: 'modelListMerge'; group: string; models: ApiModelInfo[] }
   | { type: 'chatCleared' }
   | { type: 'show_onboarding' }
   | { type: 'apiKeyValidated'; success: boolean; message?: string }
@@ -72,7 +82,15 @@ export type ExtToWebMsg =
   | { type: 'clear_error' }
   | { type: 'show_code_review' }
   | { type: 'show_inline_edit' }
-  | { type: 'quote_code'; code: string; language: string }
+  | {
+      type: 'quote_code'
+      code: string
+      language: string
+      filename?: string
+      filepath?: string
+      lineStart?: number
+      lineEnd?: number
+    }
   | { type: 'show_login' }
   | { type: 'recentFiles'; files: Array<{ name: string; path: string }> }
   | { type: 'code_review_start'; fileName?: string }
@@ -88,8 +106,34 @@ export type ExtToWebMsg =
   | { type: 'groupTokenStatus'; tokens: Record<string, boolean> }
   | { type: 'open_settings'; tab?: string; highlightGroup?: string }
   | { type: 'fileContent'; filepath: string; content: string; name: string }
+  | { type: 'fileContentError'; filepath: string; message: string }
   | { type: 'historyList'; sessions: SessionSummary[] }
   | { type: 'pricingData'; models: PricingItem[]; groupRatio: Record<string, number> }
+  | { type: 'atSearchResult'; requestId: string; kind: AtSearchKind; items: AtSearchItem[] }
+  | { type: 'applyEditStarted'; sessionId: string; filepath: string; hunks: number }
+  | { type: 'applyEditDone'; sessionId: string; status: 'accepted' | 'rejected' | 'cancelled'; message?: string }
+
+/**
+ * @mention search item kinds (Cursor 2.0 parity).
+ */
+export type AtSearchKind = 'files' | 'folders' | 'code' | 'codebase' | 'docs' | 'pastChats'
+
+export interface AtSearchItem {
+  kind: AtSearchKind
+  label: string
+  detail?: string
+  /** Primary value used for insertion (e.g. relative path, symbol name) */
+  value: string
+  /** Absolute file path when applicable */
+  filepath?: string
+  /** Line range for symbol / codebase items */
+  lineStart?: number
+  lineEnd?: number
+  /** Chat session id for pastChats kind */
+  sessionId?: string
+  /** Brief preview of matched content */
+  snippet?: string
+}
 
 /**
  * Session summary for history list.
@@ -106,9 +150,14 @@ export interface SessionSummary {
  * Messages sent from the WebView to the Extension Host.
  */
 export type WebToExtMsg =
-  | { type: 'sendMessage'; text: string; context?: CodeContext }
+  | { type: 'sendMessage'; text: string; context?: CodeContext; mode?: ChatMode }
+  | { type: 'buildFromPlan'; planContent: string; modelId?: string }
   | { type: 'getApiKey' }
-  | { type: 'applyEdit'; code: string }
+  | { type: 'applyEdit'; code: string; filename?: string; language?: string; lineRange?: string }
+  | { type: 'applyEditAcceptAll'; sessionId: string }
+  | { type: 'applyEditRejectAll'; sessionId: string }
+  | { type: 'applyEditAcceptHunk'; sessionId: string; hunkId: string }
+  | { type: 'applyEditRejectHunk'; sessionId: string; hunkId: string }
   | { type: 'ready' }
   | { type: 'getHistory' }
   | { type: 'saveMessages'; messages: StoredChatMessage[] }
@@ -135,3 +184,4 @@ export type WebToExtMsg =
   | { type: 'getFileContent'; filepath: string }
   | { type: 'getSessionHistory' }
   | { type: 'loadSession'; sessionId: string }
+  | { type: 'atSearch'; requestId: string; kind: AtSearchKind; query: string }

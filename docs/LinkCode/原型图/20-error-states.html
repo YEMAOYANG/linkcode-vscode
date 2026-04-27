@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode — 错误状态</title>
+<style>
+:root {
+  --bg-app: #0f0f0f;
+  --bg-surface: #141414;
+  --bg-elevated: #1c1c1c;
+  --bg-hover: #232323;
+  --bg-active: #2a2a2a;
+  --bg-border: #2e2e2e;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-subtle: rgba(124,58,237,0.12);
+  --accent-text: #a78bfa;
+  --text-primary: #e2e2e2;
+  --text-secondary: #888888;
+  --text-tertiary: #555555;
+  --green: #22c55e;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --blue: #3b82f6;
+  --font-ui: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-code: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  font-family: var(--font-ui); font-size: 13px; line-height: 1.5;
+  color: var(--text-primary); background: var(--bg-app); width: 100%; height: 100%; overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+/* VS Code Frame */
+.vscode-frame { width: 100%; height: 100vh; display: flex; flex-direction: column; background: var(--bg-app); overflow: hidden; }
+.vscode-titlebar {
+  height: 36px; background: var(--bg-surface); display: flex; align-items: center;
+  padding: 0 12px; gap: 8px; flex-shrink: 0; border-bottom: 1px solid var(--bg-border);
+}
+.titlebar-dot { width: 12px; height: 12px; border-radius: 50%; }
+.titlebar-dot.close { background: #ff5f57; }
+.titlebar-dot.minimize { background: #ffbd2e; }
+.titlebar-dot.maximize { background: #28c840; }
+.titlebar-title { flex: 1; text-align: center; font-size: 12px; color: var(--text-tertiary); }
+
+.vscode-body { flex: 1; display: flex; overflow: hidden; }
+
+/* Sidebar */
+.vscode-sidebar {
+  width: 48px; background: var(--bg-surface); border-right: 1px solid var(--bg-border);
+  display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 4px; flex-shrink: 0;
+}
+.sidebar-icon {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  color: var(--text-tertiary); cursor: pointer; border-radius: var(--radius-sm);
+  transition: all var(--duration-fast) var(--ease);
+}
+.sidebar-icon:hover { color: var(--text-primary); background: var(--bg-hover); }
+.sidebar-icon.active { color: var(--accent-text); }
+
+/* Main Content */
+.main-content {
+  flex: 1; display: flex; flex-direction: column; overflow: auto;
+  padding: 48px; align-items: center;
+}
+
+.page-title {
+  font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;
+  text-align: center;
+}
+.page-subtitle {
+  font-size: 12px; color: var(--text-tertiary); margin-bottom: 40px;
+  text-align: center;
+}
+
+/* Error Cards Container */
+.error-cards {
+  display: flex; flex-direction: column; gap: 24px;
+  max-width: 560px; width: 100%;
+}
+
+/* Error Card */
+.error-card {
+  background: var(--bg-surface); border: 1px solid var(--bg-border);
+  border-radius: var(--radius-lg); overflow: hidden;
+  animation: cardIn 0.4s var(--ease);
+}
+.error-card:nth-child(2) { animation-delay: 0.1s; }
+.error-card:nth-child(3) { animation-delay: 0.2s; }
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.error-card-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border-bottom: 1px solid var(--bg-border);
+  background: var(--bg-elevated);
+}
+.error-card-label {
+  font-size: 11px; font-weight: 600; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.error-card-badge {
+  font-size: 10px; padding: 1px 6px; border-radius: 3px;
+  font-weight: 500;
+}
+.badge-red { background: rgba(239,68,68,0.12); color: var(--red); }
+.badge-yellow { background: rgba(245,158,11,0.12); color: var(--yellow); }
+.badge-orange { background: rgba(249,115,22,0.12); color: #f97316; }
+
+.error-card-body {
+  padding: 24px; display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+
+/* Error Icons */
+.error-icon {
+  width: 56px; height: 56px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 16px;
+}
+.error-icon.network {
+  background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.15);
+  color: var(--red);
+}
+.error-icon.warning {
+  background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.15);
+  color: var(--yellow);
+}
+.error-icon.api {
+  background: rgba(249,115,22,0.08); border: 1px solid rgba(249,115,22,0.15);
+  color: #f97316;
+}
+
+.error-title {
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.error-desc {
+  font-size: 12px; color: var(--text-secondary); line-height: 1.6;
+  margin-bottom: 16px; max-width: 360px;
+}
+
+/* Error Detail Block */
+.error-detail {
+  width: 100%; background: #0f0f0f; border: 1px solid var(--bg-border);
+  border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 16px;
+  text-align: left; font-family: var(--font-code); font-size: 11px; line-height: 1.6;
+}
+.error-detail .label { color: var(--text-tertiary); }
+.error-detail .value { color: var(--red); }
+.error-detail .value-warn { color: var(--yellow); }
+
+/* Action Buttons */
+.error-actions { display: flex; gap: 8px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 16px; border-radius: var(--radius-md); font-size: 12px; font-weight: 500;
+  border: 1px solid var(--bg-border); background: var(--bg-elevated); color: var(--text-primary);
+  cursor: pointer; transition: all var(--duration-fast) var(--ease); font-family: var(--font-ui);
+}
+.btn:hover { background: var(--bg-hover); border-color: #3a3a3a; }
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-danger { background: var(--red); border-color: var(--red); color: #fff; }
+.btn-danger:hover { background: #dc2626; }
+.btn-warning { background: var(--yellow); border-color: var(--yellow); color: #000; }
+.btn-warning:hover { background: #d97706; }
+.btn-ghost {
+  background: transparent; border-color: transparent; color: var(--text-secondary);
+}
+.btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* Connection Status Indicator */
+.connection-status {
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 12px;
+}
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.status-dot.offline { background: var(--red); }
+.status-dot.warning { background: var(--yellow); }
+@keyframes pulse {
+  0%, 100% { opacity: 1; } 50% { opacity: 0.4; }
+}
+.status-text { font-size: 11px; }
+.status-text.offline { color: var(--red); }
+.status-text.warning { color: var(--yellow); }
+
+/* Suggestion line */
+.suggestion {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-tertiary); margin-top: 12px;
+  padding: 8px 12px; background: var(--bg-elevated);
+  border-radius: var(--radius-md); width: 100%;
+}
+.suggestion svg { flex-shrink: 0; color: var(--accent-text); }
+
+/* Status Bar */
+.vscode-statusbar {
+  height: 24px; background: var(--bg-surface); border-top: 1px solid var(--bg-border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 10px;
+  font-size: 11px; flex-shrink: 0;
+}
+.statusbar-left, .statusbar-right { display: flex; align-items: center; gap: 12px; }
+.statusbar-item { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); }
+
+/* Back to Index */
+.back-to-index {
+  position: fixed; top: 42px; right: 12px; z-index: 9999;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; background: rgba(28,28,28,0.9);
+  border: 1px solid #2e2e2e; border-radius: 6px;
+  color: #a78bfa; font-size: 11px; font-weight: 500;
+  cursor: pointer; backdrop-filter: blur(8px);
+  transition: all 0.15s var(--ease); text-decoration: none;
+  font-family: var(--font-ui); opacity: 0.7;
+}
+.back-to-index:hover { opacity: 1; background: rgba(44,44,44,0.95); border-color: #7c3aed; text-decoration: none; }
+</style>
+</head>
+<body>
+<a href="index.html" class="back-to-index">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+  导航页
+</a>
+
+<div class="vscode-frame">
+  <div class="vscode-titlebar">
+    <div class="titlebar-dot close"></div><div class="titlebar-dot minimize"></div><div class="titlebar-dot maximize"></div>
+    <div class="titlebar-title">LinkCode — 错误状态</div>
+    <div style="width:36px"></div>
+  </div>
+
+  <div class="vscode-body">
+    <!-- Sidebar -->
+    <div class="vscode-sidebar">
+      <div class="sidebar-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg></div>
+      <div class="sidebar-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+      <div class="sidebar-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 01-9 9"/></svg></div>
+      <div class="sidebar-icon active"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+      <div style="flex:1"></div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <div class="page-title">⚠️ 错误状态规范</div>
+      <div class="page-subtitle">LinkCode 中可能出现的 3 种异常场景及对应恢复路径</div>
+
+      <div class="error-cards">
+        <!-- Error 1: Network Disconnected -->
+        <div class="error-card">
+          <div class="error-card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0119 12.55"/><path d="M5 12.55a10.94 10.94 0 015.17-2.39"/><path d="M10.71 5.05A16 16 0 0122.56 9"/><path d="M1.42 9a15.91 15.91 0 014.7-2.88"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+            <span class="error-card-label">场景 1：网络断开</span>
+            <span class="error-card-badge badge-red">Critical</span>
+          </div>
+          <div class="error-card-body">
+            <div class="error-icon network">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0119 12.55"/><path d="M5 12.55a10.94 10.94 0 015.17-2.39"/><path d="M10.71 5.05A16 16 0 0122.56 9"/><path d="M1.42 9a15.91 15.91 0 014.7-2.88"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+            </div>
+            <div class="connection-status">
+              <div class="status-dot offline"></div>
+              <span class="status-text offline">网络未连接</span>
+            </div>
+            <div class="error-title">网络连接失败</div>
+            <div class="error-desc">无法连接到模型服务，请检查你的网络连接或代理设置。</div>
+            <div class="error-actions">
+              <button class="btn btn-primary">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                重试连接
+              </button>
+              <button class="btn btn-ghost">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33"/></svg>
+                网络诊断
+              </button>
+            </div>
+            <div class="suggestion">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              提示：可在 设置 → 网络 中配置代理
+            </div>
+          </div>
+        </div>
+
+        <!-- Error 2: API Key Invalid -->
+        <div class="error-card">
+          <div class="error-card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span class="error-card-label">场景 2：API Key 失效</span>
+            <span class="error-card-badge badge-yellow">Warning</span>
+          </div>
+          <div class="error-card-body">
+            <div class="error-icon warning">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.78 7.78 5.5 5.5 0 017.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            </div>
+            <div class="connection-status">
+              <div class="status-dot warning"></div>
+              <span class="status-text warning">认证失败</span>
+            </div>
+            <div class="error-title">API Key 已失效</div>
+            <div class="error-desc">你的 OpenAI API Key 已过期或无效，请前往设置页面更新。其他模型的 Key 仍然正常。</div>
+            <div class="error-detail">
+              <span class="label">Provider: </span><span class="value-warn">OpenAI</span><br>
+              <span class="label">Key: </span><span class="value-warn">sk-...3xF7</span><br>
+              <span class="label">Status: </span><span class="value">INVALID — 401 Unauthorized</span><br>
+              <span class="label">Checked: </span><span style="color:var(--text-secondary)">2 分钟前</span>
+            </div>
+            <div class="error-actions">
+              <button class="btn btn-warning">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06"/></svg>
+                前往设置
+              </button>
+              <button class="btn btn-ghost">暂时跳过（使用其他模型）</button>
+            </div>
+            <div class="suggestion">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              智能路由将自动切换到可用的模型
+            </div>
+          </div>
+        </div>
+
+        <!-- Error 3: Model Call Failed -->
+        <div class="error-card">
+          <div class="error-card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            <span class="error-card-label">场景 3：模型调用失败</span>
+            <span class="error-card-badge badge-orange">Error</span>
+          </div>
+          <div class="error-card-body">
+            <div class="error-icon api">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            </div>
+            <div class="error-title">模型调用失败</div>
+            <div class="error-desc">DeepSeek-V3 响应超时，可能是服务端过载。可以尝试切换到备用模型继续工作。</div>
+            <div class="error-detail">
+              <span class="label">Model: </span><span style="color:#f97316">DeepSeek-V3</span><br>
+              <span class="label">Error: </span><span class="value">504 Gateway Timeout</span><br>
+              <span class="label">Latency: </span><span class="value">30,012ms (超时)</span><br>
+              <span class="label">Request ID: </span><span style="color:var(--text-secondary)">req_8f7a2c3d...e9b1</span><br>
+              <span class="label">Retry: </span><span style="color:var(--text-secondary)">已自动重试 2 次</span>
+            </div>
+            <div class="error-actions">
+              <button class="btn btn-primary">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg>
+                切换备用模型
+              </button>
+              <button class="btn">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                重试原模型
+              </button>
+              <button class="btn btn-ghost">取消</button>
+            </div>
+            <div class="suggestion">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              建议备用模型：GPT-4o（延迟 ~200ms，成本 +¥0.02）
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="vscode-statusbar">
+    <div class="statusbar-left">
+      <div class="statusbar-item" style="color:var(--accent-text);">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        LinkCode
+      </div>
+      <div class="statusbar-item" style="color:var(--red);">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+        连接异常
+      </div>
+    </div>
+    <div class="statusbar-right">
+      <div class="statusbar-item" style="color:var(--yellow);">⚠ 1 个 Key 失效</div>
+      <div class="statusbar-item" style="color:var(--green);">Token: ¥12.50</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

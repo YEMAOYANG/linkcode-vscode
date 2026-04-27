@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode - 模型选择 & 路由设置</title>
+<link rel="stylesheet" href="shared-styles.css">
+<style>
+body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.settings-layout { flex: 1; display: flex; overflow: hidden; }
+.settings-nav {
+  width: 220px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  padding: 16px 0;
+}
+.settings-nav-item {
+  padding: 8px 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.settings-nav-item.active {
+  color: var(--text-bright);
+  background: var(--bg-selected);
+  border-left: 2px solid var(--accent);
+}
+.settings-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 36px;
+}
+.settings-section { margin-bottom: 32px; }
+.settings-section h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 6px;
+}
+.settings-section .desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 18px;
+}
+.auto-route-card {
+  background: linear-gradient(135deg, rgba(124,92,252,0.08), rgba(94,162,239,0.08));
+  border: 1px solid rgba(124,92,252,0.25);
+  border-radius: var(--radius-lg);
+  padding: 18px 22px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.auto-route-info h3 { font-size: 15px; color: var(--text-bright); margin-bottom: 4px; }
+.auto-route-info p { font-size: 12px; color: var(--text-secondary); }
+.toggle {
+  width: 44px; height: 24px;
+  background: var(--accent);
+  border-radius: 12px;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.toggle::after {
+  content: '';
+  position: absolute;
+  width: 18px; height: 18px;
+  background: white;
+  border-radius: 50%;
+  top: 3px; left: 23px;
+  transition: left 0.2s;
+}
+.toggle.off { background: var(--bg-input); }
+.toggle.off::after { left: 3px; }
+.route-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 12px;
+}
+.route-table th {
+  text-align: left;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.route-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: var(--text-primary);
+}
+.route-table tr:hover td { background: var(--bg-hover); }
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.model-card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.model-card:hover { border-color: var(--accent); }
+.model-card.selected { border-color: var(--accent); background: rgba(124,92,252,0.06); }
+.model-card .model-name { font-size: 13px; font-weight: 600; color: var(--text-bright); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+.model-card .model-provider { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+.model-card .model-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); }
+.model-card .model-price { color: var(--green); }
+.provider-badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.provider-cn { background: rgba(241, 76, 76, 0.12); color: #f08080; }
+.provider-intl { background: rgba(94, 162, 239, 0.12); color: #5ea2ef; }
+.search-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px 8px 36px;
+  color: var(--text-primary);
+  font-size: 13px;
+  width: 100%;
+  outline: none;
+  margin-bottom: 14px;
+}
+.search-input:focus { border-color: var(--accent); }
+.search-wrapper { position: relative; }
+.search-wrapper svg { position: absolute; left: 10px; top: 9px; color: var(--text-muted); }
+.filter-tags { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.filter-tag {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.filter-tag.active { border-color: var(--accent); color: var(--accent-light); background: rgba(124,92,252,0.1); }
+</style>
+</head>
+<body>
+<div class="macos-window">
+  <div class="titlebar">
+    <div class="traffic-lights"><span class="tl-close"></span><span class="tl-minimize"></span><span class="tl-maximize"></span></div>
+    <div class="titlebar-text">LinkCode 设置 — 模型 & 路由</div>
+  </div>
+  <div class="vscode-layout">
+    <div class="activity-bar">
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7v10l4-3V10L3 7zm0 0l9-4 9 4M12 3v18m0 0l9-4V7"/></svg></div>
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg></div>
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="#7c3aed" opacity="0.5"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="#7c3aed" stroke-width="1.5" fill="none" opacity="0.5"/></svg></div>
+      <div class="activity-spacer"></div>
+      <div class="activity-icon active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4m-8.66-2.34l2.83-2.83m11.66-5.66l2.83-2.83M1 12h4m14 0h4m-2.34-8.66l-2.83 2.83M6.17 17.17l-2.83 2.83"/></svg></div>
+    </div>
+    <div class="settings-layout">
+      <div class="settings-nav">
+        <div style="padding:8px 20px 16px;"><span class="linkcode-logo"><svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="#7c3aed" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="#7c3aed" stroke-width="1.5" fill="none"/></svg><span class="linkcode-logo-text" style="font-size:13px;">LinkCode 设置</span></span></div>
+        <div class="settings-nav-item">🔑 账户</div>
+        <div class="settings-nav-item active">🤖 模型管理</div>
+        <div class="settings-nav-item">⚡ 自动路由</div>
+        <div class="settings-nav-item">✏️ 代码补全</div>
+        <div class="settings-nav-item">💬 对话设置</div>
+        <div class="settings-nav-item">🎨 外观</div>
+        <div class="settings-nav-item">⌨️ 快捷键</div>
+        <div class="settings-nav-item">📊 用量统计</div>
+      </div>
+      <div class="settings-content">
+        <!-- Auto Route -->
+        <div class="settings-section">
+          <div class="auto-route-card">
+            <div class="auto-route-info">
+              <h3>⚡ 智能多模型自动路由</h3>
+              <p>根据任务类型自动选择最优模型，降低 40%+ 成本 · <span class="badge badge-pro" style="font-size:10px;">Pro</span></p>
+            </div>
+            <div class="toggle"></div>
+          </div>
+          <h2>路由映射规则</h2>
+          <p class="desc">自动路由根据以下规则选择最优模型</p>
+          <table class="route-table">
+            <thead><tr><th>任务类型</th><th>默认模型</th><th>备选模型</th><th>估算成本</th></tr></thead>
+            <tbody>
+              <tr><td>💡 代码补全</td><td><strong>DeepSeek-V3</strong></td><td>Qwen-Coder-32B</td><td style="color:var(--green);">¥0.001/次</td></tr>
+              <tr><td>💬 普通对话</td><td><strong>Doubao-Pro-128K</strong></td><td>Qwen-Max</td><td style="color:var(--green);">¥0.002/次</td></tr>
+              <tr><td>🧠 复杂推理</td><td><strong>Claude-3.5-Sonnet</strong></td><td>GPT-4o</td><td style="color:var(--warning);">¥0.015/次</td></tr>
+              <tr><td>📝 代码审查</td><td><strong>DeepSeek-R1</strong></td><td>Claude-3.5-Sonnet</td><td style="color:var(--warning);">¥0.008/次</td></tr>
+              <tr><td>✏️ Inline 编辑</td><td><strong>Qwen-Coder-32B</strong></td><td>DeepSeek-V3</td><td style="color:var(--green);">¥0.002/次</td></tr>
+              <tr><td>📖 文档生成</td><td><strong>Doubao-Pro-128K</strong></td><td>GLM-4-Plus</td><td style="color:var(--green);">¥0.001/次</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Model List -->
+        <div class="settings-section">
+          <h2>模型库 <span style="font-size:13px;font-weight:400;color:var(--text-muted);">（61+ 个模型）</span></h2>
+          <p class="desc">选择对话和代码补全的默认模型</p>
+          <div class="search-wrapper">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input class="search-input" placeholder="搜索模型名称..." />
+          </div>
+          <div class="filter-tags">
+            <span class="filter-tag active">全部</span>
+            <span class="filter-tag">🇨🇳 国产模型</span>
+            <span class="filter-tag">🌍 国际模型</span>
+            <span class="filter-tag">代码专用</span>
+            <span class="filter-tag">推理增强</span>
+            <span class="filter-tag">长上下文</span>
+          </div>
+          <div class="model-grid">
+            <div class="model-card selected">
+              <div class="model-name">DeepSeek-V3 <span class="provider-badge provider-cn">国产</span></div>
+              <div class="model-provider">深度求索 · 代码补全推荐</div>
+              <div class="model-meta"><span>128K 上下文</span><span class="model-price">¥0.5/百万Token</span></div>
+            </div>
+            <div class="model-card">
+              <div class="model-name">DeepSeek-R1 <span class="provider-badge provider-cn">国产</span></div>
+              <div class="model-provider">深度求索 · 推理增强</div>
+              <div class="model-meta"><span>128K 上下文</span><span class="model-price">¥2.0/百万Token</span></div>
+            </div>
+            <div class="model-card">
+              <div class="model-name">Qwen-Max <span class="provider-badge provider-cn">国产</span></div>
+              <div class="model-provider">阿里通义 · 综合能力强</div>
+              <div class="model-meta"><span>128K 上下文</span><span class="model-price">¥1.2/百万Token</span></div>
+            </div>
+            <div class="model-card">
+              <div class="model-name">Qwen-Coder-32B <span class="provider-badge provider-cn">国产</span></div>
+              <div class="model-provider">阿里通义 · 代码专用</div>
+              <div class="model-meta"><span>32K 上下文</span><span class="model-price">¥0.8/百万Token</span></div>
+            </div>
+            <div class="model-card">
+              <div class="model-name">Doubao-Pro-128K <span class="provider-badge provider-cn">国产</span></div>
+              <div class="model-provider">字节豆包 · 长文本</div>
+              <div class="model-meta"><span>128K 上下文</span><span class="model-price">¥0.3/百万Token</span></div>
+            </div>
+            <div class="model-card">
+              <div class="model-name">GLM-4-Plus <span class="provider-badge provider-cn">国产</span></div>
+              <div class="model-provider">智谱 · 综合能力</div>
+              <div class="model-meta"><span>128K 上下文</span><span class="model-price">¥0.5/百万Token</span></div>
+            </div>
+            <div class="model-card">
+              <div class="model-name">Claude-3.5-Sonnet <span class="provider-badge provider-intl">国际</span></div>
+              <div class="model-provider">Anthropic · 代码王者</div>
+              <div class="model-meta"><span>200K 上下文</span><span class="model-price">¥15/百万Token</span></div>
+            </div>
+            <div class="model-card">
+              <div class="model-name">GPT-4o <span class="provider-badge provider-intl">国际</span></div>
+              <div class="model-provider">OpenAI · 全能旗舰</div>
+              <div class="model-meta"><span>128K 上下文</span><span class="model-price">¥12/百万Token</span></div>
+            </div>
+            <div class="model-card">
+              <div class="model-name">Gemini-2.0-Pro <span class="provider-badge provider-intl">国际</span></div>
+              <div class="model-provider">Google · 多模态</div>
+              <div class="model-meta"><span>1M 上下文</span><span class="model-price">¥8/百万Token</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div class="status-accent"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.5" fill="none"/></svg> LinkCode</div>
+    <div class="status-bar-left"><div class="status-item">⚡ 自动路由已开启</div><div class="status-item">🪙 ¥12.50</div></div>
+    <div class="status-bar-right"><div class="status-item">61+ 模型可用</div></div>
+  </div>
+</div>
+<script>
+// Model card hover effects (already in CSS but add click selection)
+document.querySelectorAll('.model-card, [class*="route-row"]').forEach(card => {
+  card.style.transition = 'all 0.2s ease';
+  card.addEventListener('mouseenter', () => {
+    card.style.transform = 'translateY(-2px)';
+    card.style.borderColor = 'rgba(124,58,237,0.4)';
+  });
+  card.addEventListener('mouseleave', () => {
+    card.style.transform = '';
+    card.style.borderColor = '';
+  });
+});
+
+// Toggle switch animation
+document.querySelectorAll('.toggle, [class*="switch"]').forEach(toggle => {
+  toggle.style.cursor = 'pointer';
+  toggle.addEventListener('click', () => {
+    toggle.classList.toggle('active');
+  });
+});
+
+// Settings nav click
+document.querySelectorAll('.settings-nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

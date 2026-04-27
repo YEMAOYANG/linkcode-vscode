@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode - 侧边栏 Chat 面板</title>
+<link rel="stylesheet" href="shared-styles.css">
+<style>
+body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.chat-panel {
+  width: 380px;
+  background: var(--bg-sidebar);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.chat-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.chat-header-left { display: flex; align-items: center; gap: 8px; }
+.chat-header h3 { font-size: 13px; font-weight: 600; color: var(--text-bright); }
+.chat-model-select {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.msg { animation: fadeIn 0.3s ease; }
+.msg-user {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.msg-user .msg-label {
+  font-size: 11px; font-weight: 600; color: var(--text-secondary);
+  margin-bottom: 4px; display: flex; align-items: center; gap: 6px;
+}
+.msg-user .msg-bubble {
+  background: transparent;
+  color: var(--text-primary);
+  border-radius: 0;
+  padding: 0;
+  font-size: 13px;
+  max-width: 100%;
+  line-height: 1.6;
+}
+.msg-ai { display: flex; flex-direction: column; gap: 6px; border-left: 2px solid var(--accent); padding-left: 12px; }
+.msg-ai-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.msg-ai-avatar {
+  width: 20px; height: 20px;
+  border-radius: 6px;
+  background: var(--accent-gradient);
+  display: flex; align-items: center; justify-content: center;
+}
+.msg-ai-avatar svg { width: 12px; height: 12px; }
+.msg-ai-content {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  padding-left: 26px;
+}
+.msg-ai-content p { margin-bottom: 8px; }
+.msg-code-block {
+  background: #1a1a2e;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin: 8px 0;
+}
+.msg-code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: rgba(0,0,0,0.2);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.msg-code-header .copy-btn {
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.msg-code-header .copy-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+.msg-code-body {
+  padding: 10px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+.msg-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(124, 92, 252, 0.15);
+  color: var(--accent-light);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.chat-input-area {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-sidebar);
+}
+.chat-input-wrapper {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.15s;
+}
+.chat-input-wrapper:focus-within { border-color: var(--accent); }
+.chat-textarea {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  resize: none;
+  outline: none;
+  min-height: 36px;
+  line-height: 1.5;
+}
+.chat-textarea::placeholder { color: var(--text-muted); }
+.chat-input-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.chat-input-tags { display: flex; gap: 4px; }
+.chat-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.chat-tag:hover { border-color: var(--border); color: var(--text-primary); }
+.send-btn {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  background: var(--accent-gradient);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s;
+}
+.send-btn:hover { opacity: 0.85; }
+.send-btn svg { width: 14px; height: 14px; }
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  padding-left: 26px;
+}
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+.file-tree-item { padding: 3px 8px 3px 24px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+.file-tree-item:hover { background: var(--bg-hover); }
+.folder-toggle { padding: 3px 8px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; color: var(--text-primary); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="macos-window">
+  <div class="titlebar">
+    <div class="traffic-lights"><span class="tl-close"></span><span class="tl-minimize"></span><span class="tl-maximize"></span></div>
+    <div class="titlebar-text">app.tsx — my-project — LinkCode</div>
+  </div>
+  <div class="vscode-layout">
+    <!-- Activity Bar -->
+    <div class="activity-bar">
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7v10l4-3V10L3 7zm0 0l9-4 9 4M12 3v18m0 0l9-4V7"/></svg></div>
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg></div>
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7.03 3 3 7.03 3 12h3l-4 4-4-4h3c0-5.52 4.48-10 10-10V3z"/></svg></div>
+      <div class="activity-icon active" title="LinkCode AI">
+        <svg viewBox="0 0 24 24" fill="none"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#5ea2ef"/></linearGradient></defs><path d="M12 2L2 7l10 5 10-5-10-5z" fill="url(#lg)" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="url(#lg)" stroke-width="1.5" fill="none"/></svg>
+      </div>
+      <div class="activity-spacer"></div>
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4m-8.66-2.34l2.83-2.83m11.66-5.66l2.83-2.83M1 12h4m14 0h4"/></svg></div>
+    </div>
+    <!-- Editor -->
+    <div class="editor-area">
+      <div class="tab-bar">
+        <div class="tab active"><span class="tab-icon" style="color:#3178c6;">TS</span> app.tsx <span class="tab-close">×</span></div>
+      </div>
+      <div class="editor-content">
+        <div class="code-editor">
+          <div class="line-numbers"><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div><div>13</div><div>14</div><div>15</div><div>16</div><div>17</div><div>18</div><div>19</div><div>20</div><div>21</div><div>22</div><div>23</div><div>24</div><div>25</div><div>26</div><div>27</div><div>28</div><div>29</div><div>30</div><div>31</div><div>32</div><div>33</div><div>34</div><div>35</div><div>36</div><div>37</div><div>38</div></div>
+          <div class="code-lines">
+            <div><span class="kw">import</span> { <span class="var">useState</span>, <span class="var">useEffect</span> } <span class="kw">from</span> <span class="str">'react'</span>;</div>
+            <div><span class="kw">import</span> { <span class="type">User</span> } <span class="kw">from</span> <span class="str">'./types'</span>;</div>
+            <div></div>
+            <div><span class="kw">interface</span> <span class="type">Props</span> {</div>
+            <div>  <span class="var">userId</span>: <span class="type">string</span>;</div>
+            <div>  <span class="var">onUpdate</span>?: (<span class="var">user</span>: <span class="type">User</span>) => <span class="type">void</span>;</div>
+            <div>}</div>
+            <div></div>
+            <div><span class="kw">export default function</span> <span class="fn">UserProfile</span>({ <span class="var">userId</span>, <span class="var">onUpdate</span> }: <span class="type">Props</span>) {</div>
+            <div>  <span class="kw">const</span> [<span class="var">user</span>, <span class="fn">setUser</span>] = <span class="fn">useState</span>&lt;<span class="type">User</span> | <span class="type">null</span>&gt;(<span class="bl">null</span>);</div>
+            <div>  <span class="kw">const</span> [<span class="var">loading</span>, <span class="fn">setLoading</span>] = <span class="fn">useState</span>(<span class="bl">true</span>);</div>
+            <div></div>
+            <div>  <span class="fn">useEffect</span>(() => {</div>
+            <div>    <span class="fn">fetchUser</span>(<span class="var">userId</span>).<span class="fn">then</span>(<span class="var">data</span> => {</div>
+            <div>      <span class="fn">setUser</span>(<span class="var">data</span>);</div>
+            <div>      <span class="fn">setLoading</span>(<span class="bl">false</span>);</div>
+            <div>    });</div>
+            <div>  }, [<span class="var">userId</span>]);</div>
+            <div></div>
+            <div>  <span class="kw">if</span> (<span class="var">loading</span>) <span class="kw">return</span> &lt;<span class="type">Spinner</span> /&gt;;</div>
+            <div></div>
+            <div>  <span class="kw">return</span> (</div>
+            <div>    &lt;<span class="type">div</span> <span class="var">className</span>=<span class="str">"profile-card"</span>&gt;</div>
+            <div>      &lt;<span class="type">Avatar</span> <span class="var">src</span>={<span class="var">user</span>.<span class="var">avatar</span>} /&gt;</div>
+            <div>      &lt;<span class="type">h2</span>&gt;{<span class="var">user</span>.<span class="var">name</span>}&lt;/<span class="type">h2</span>&gt;</div>
+            <div>      &lt;<span class="type">p</span>&gt;{<span class="var">user</span>.<span class="var">bio</span>}&lt;/<span class="type">p</span>&gt;</div>
+            <div>      &lt;<span class="type">Button</span> <span class="var">onClick</span>={() => <span class="var">onUpdate</span>?.(<span class="var">user</span>)}&gt;</div>
+            <div>        编辑资料</div>
+            <div>      &lt;/<span class="type">Button</span>&gt;</div>
+            <div>    &lt;/<span class="type">div</span>&gt;</div>
+            <div>  );</div>
+            <div>}</div>
+            <div></div>
+            <div><span class="kw">async function</span> <span class="fn">fetchUser</span>(<span class="var">id</span>: <span class="type">string</span>): <span class="type">Promise</span>&lt;<span class="type">User</span>&gt; {</div>
+            <div>  <span class="kw">const</span> <span class="var">res</span> = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">`/api/users/${<span class="var">id</span>}`</span>);</div>
+            <div>  <span class="kw">return</span> <span class="var">res</span>.<span class="fn">json</span>();</div>
+            <div>}</div>
+            <div></div>
+            <div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Chat Panel -->
+    <div class="chat-panel">
+      <div class="chat-header">
+        <div class="chat-header-left">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="#7c3aed" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="#7c3aed" stroke-width="1.5" fill="none"/></svg>
+          <h3>LinkCode Chat</h3>
+        </div>
+        <div class="chat-model-select">
+          <span style="width:6px;height:6px;border-radius:50%;background:#4ec9b0;"></span>
+          DeepSeek-V3 ▾
+        </div>
+      </div>
+      <div class="chat-messages">
+        <!-- User msg -->
+        <div class="msg msg-user">
+          <div class="msg-label">👤 你</div>
+          <div class="msg-bubble">
+            帮我给 <span class="msg-ref">@app.tsx</span> 中的 UserProfile 组件添加错误处理和加载状态的骨架屏效果
+          </div>
+        </div>
+        <!-- AI msg -->
+        <div class="msg msg-ai">
+          <div class="msg-ai-header">
+            <div class="msg-ai-avatar"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.5" fill="none"/></svg></div>
+            DeepSeek-V3 · 1.2s · 386 tokens
+          </div>
+          <div class="msg-ai-content">
+            <p>好的！我来为 <code>UserProfile</code> 添加错误处理和骨架屏效果。主要改动：</p>
+            <p>1. 添加 <code>error</code> 状态管理<br>2. 新增 <code>SkeletonLoader</code> 组件<br>3. 使用 <code>try/catch</code> 包裹 API 调用</p>
+            <div class="msg-code-block">
+              <div class="msg-code-header">
+                <span>app.tsx</span>
+                <button class="copy-btn">📋 复制</button>
+              </div>
+              <div class="msg-code-body">
+<span class="kw">export default function</span> <span class="fn">UserProfile</span>({ <span class="var">userId</span>, <span class="var">onUpdate</span> }: <span class="type">Props</span>) {
+  <span class="kw">const</span> [<span class="var">user</span>, <span class="fn">setUser</span>] = <span class="fn">useState</span>&lt;<span class="type">User</span> | <span class="type">null</span>&gt;(<span class="bl">null</span>);
+  <span class="kw">const</span> [<span class="var">loading</span>, <span class="fn">setLoading</span>] = <span class="fn">useState</span>(<span class="bl">true</span>);
+  <span class="kw">const</span> [<span class="var">error</span>, <span class="fn">setError</span>] = <span class="fn">useState</span>&lt;<span class="type">string</span> | <span class="type">null</span>&gt;(<span class="bl">null</span>);
+
+  <span class="fn">useEffect</span>(() =&gt; {
+    <span class="fn">fetchUser</span>(<span class="var">userId</span>)
+      .<span class="fn">then</span>(<span class="var">data</span> =&gt; <span class="fn">setUser</span>(<span class="var">data</span>))
+      .<span class="fn">catch</span>(<span class="var">e</span> =&gt; <span class="fn">setError</span>(<span class="var">e</span>.<span class="var">message</span>))
+      .<span class="fn">finally</span>(() =&gt; <span class="fn">setLoading</span>(<span class="bl">false</span>));
+  }, [<span class="var">userId</span>]);
+
+  <span class="kw">if</span> (<span class="var">loading</span>) <span class="kw">return</span> &lt;<span class="type">SkeletonLoader</span> /&gt;;
+  <span class="kw">if</span> (<span class="var">error</span>) <span class="kw">return</span> &lt;<span class="type">ErrorBanner</span> <span class="var">msg</span>={<span class="var">error</span>} /&gt;;
+  <span class="cm">// ... 其余不变</span>
+}</div>
+            </div>
+            <p style="margin-top:4px;">需要我继续实现 <code>SkeletonLoader</code> 组件吗？</p>
+          </div>
+        </div>
+        <!-- User msg 2 -->
+        <div class="msg msg-user">
+          <div class="msg-label">👤 你</div>
+          <div class="msg-bubble">
+            好的，帮我实现骨架屏组件，参考 <span class="msg-ref">@workspace</span> 的设计规范
+          </div>
+        </div>
+        <!-- AI typing -->
+        <div class="msg msg-ai">
+          <div class="msg-ai-header">
+            <div class="msg-ai-avatar"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.5" fill="none"/></svg></div>
+            DeepSeek-V3 · 正在思考...
+          </div>
+          <div class="typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+        </div>
+      </div>
+      <!-- Chat Input -->
+      <div class="chat-input-area">
+        <div class="chat-input-wrapper">
+          <textarea class="chat-textarea" placeholder="输入消息... (⌘Enter 发送)" rows="2"></textarea>
+          <div class="chat-input-actions">
+            <div class="chat-input-tags">
+              <span class="chat-tag">@file</span>
+              <span class="chat-tag">@workspace</span>
+              <span class="chat-tag">@terminal</span>
+              <span class="chat-tag">@web</span>
+            </div>
+            <button class="send-btn"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="white" stroke-width="2" stroke-linecap="round"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div class="status-accent">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.5" fill="none"/></svg>
+      LinkCode
+    </div>
+    <div class="status-bar-left">
+      <div class="status-item"><span style="width:6px;height:6px;border-radius:50%;background:#4ec9b0;display:inline-block;"></span> DeepSeek-V3</div>
+      <div class="status-item">⚡ 自动路由</div>
+      <div class="status-item">🪙 ¥12.50</div>
+    </div>
+    <div class="status-bar-right">
+      <div class="status-item">TypeScript React</div>
+    </div>
+  </div>
+</div>
+<script>
+// Copy button interaction
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const orig = btn.textContent;
+    btn.textContent = '✅ 已复制';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1500);
+  });
+});
+
+// Streaming typing effect for last AI message
+const lastAI = document.querySelector('.msg-ai:last-child .msg-ai-content p:last-child');
+if (lastAI) {
+  const text = lastAI.textContent;
+  lastAI.innerHTML = '';
+  let i = 0;
+  const cursor = document.createElement('span');
+  cursor.className = 'cursor-blink';
+  cursor.textContent = '█';
+  cursor.style.color = 'var(--accent)';
+  lastAI.appendChild(cursor);
+  const timer = setInterval(() => {
+    if (i < text.length) {
+      cursor.before(document.createTextNode(text[i]));
+      i++;
+    } else {
+      clearInterval(timer);
+      cursor.remove();
+    }
+  }, 30);
+}
+
+// Model selector dropdown
+const modelSelect = document.querySelector('.chat-model-select');
+if (modelSelect) {
+  modelSelect.addEventListener('click', () => {
+    const models = ['DeepSeek-V3', 'Claude Sonnet', 'GPT-4o', 'Qwen-72B'];
+    const current = modelSelect.textContent.trim().replace(' ▾', '');
+    const next = models[(models.indexOf(current) + 1) % models.length];
+    modelSelect.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:#4ec9b0;"></span>' + next + ' ▾';
+  });
+}
+</script>
+</body>
+</html>

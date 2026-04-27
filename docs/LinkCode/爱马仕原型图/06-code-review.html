@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode - AI 代码审查</title>
+<link rel="stylesheet" href="shared-styles.css">
+<style>
+body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.review-panel {
+  width: 340px;
+  background: var(--bg-sidebar);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.review-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.review-header h3 { font-size: 13px; font-weight: 600; color: var(--text-bright); display: flex; align-items: center; gap: 6px; }
+.review-summary {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,0,0,0.15);
+}
+.review-score {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.score-circle {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  border: 3px solid var(--warning);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--warning);
+  flex-shrink: 0;
+}
+.score-text .title { font-size: 14px; font-weight: 600; color: var(--text-bright); }
+.score-text .detail { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.review-stats { display: flex; gap: 12px; }
+.review-stat {
+  flex: 1;
+  padding: 6px 8px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+.review-stat .num { font-size: 16px; font-weight: 700; }
+.review-stat .lbl { font-size: 10px; color: var(--text-muted); }
+.review-items { flex: 1; overflow-y: auto; padding: 8px; }
+.review-item {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.review-item:hover { border-color: var(--accent); }
+.review-item .severity {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  margin-right: 6px;
+}
+.severity-error { background: rgba(241,76,76,0.15); color: var(--red); }
+.severity-warn { background: rgba(204,167,0,0.15); color: var(--warning); }
+.severity-info { background: rgba(94,162,239,0.15); color: var(--info); }
+.review-item .ri-title { font-size: 13px; color: var(--text-bright); margin-bottom: 4px; }
+.review-item .ri-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
+.review-item .ri-line { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+/* Diff view */
+.diff-view { flex: 1; overflow: auto; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 20px; }
+.diff-file-header {
+  padding: 8px 16px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+}
+.diff-hunk { padding: 4px 16px; background: rgba(124,92,252,0.06); color: var(--accent-light); font-size: 12px; border-bottom: 1px solid var(--border); }
+.dl { display: flex; height: 20px; align-items: center; }
+.dl .ln { width: 45px; text-align: right; padding-right: 10px; color: var(--text-muted); font-size: 12px; user-select: none; flex-shrink: 0; }
+.dl .ln2 { width: 45px; text-align: right; padding-right: 10px; color: var(--text-muted); font-size: 12px; user-select: none; flex-shrink: 0; }
+.dl .code { flex: 1; white-space: pre; padding-left: 8px; }
+.dl.add { background: rgba(78,201,176,0.07); }
+.dl.add .ln { color: transparent; }
+.dl.add .code::before { content: '+'; color: var(--green); margin-right: 6px; }
+.dl.del { background: rgba(241,76,76,0.07); }
+.dl.del .ln2 { color: transparent; }
+.dl.del .code::before { content: '-'; color: var(--red); margin-right: 6px; }
+.dl.ctx .code::before { content: ' '; margin-right: 6px; }
+.annotation {
+  margin: 4px 16px;
+  background: rgba(204,167,0,0.06);
+  border: 1px solid rgba(204,167,0,0.2);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: flex;
+  gap: 10px;
+}
+.annotation .ann-icon { font-size: 16px; flex-shrink: 0; }
+.annotation .ann-text { font-size: 12px; color: var(--text-primary); line-height: 1.5; font-family: 'Inter', sans-serif; }
+.annotation .ann-text strong { color: var(--warning); }
+.annotation.ann-error { background: rgba(241,76,76,0.06); border-color: rgba(241,76,76,0.2); }
+.annotation.ann-error .ann-text strong { color: var(--red); }
+.file-tree-item { padding: 3px 8px 3px 24px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<div class="macos-window">
+  <div class="titlebar">
+    <div class="traffic-lights"><span class="tl-close"></span><span class="tl-minimize"></span><span class="tl-maximize"></span></div>
+    <div class="titlebar-text">LinkCode — AI 代码审查 — feat/user-profile</div>
+  </div>
+  <div class="vscode-layout">
+    <div class="activity-bar">
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7v10l4-3V10L3 7zm0 0l9-4 9 4M12 3v18m0 0l9-4V7"/></svg></div>
+      <div class="activity-icon active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3C7.03 3 3 7.03 3 12h3l-4 4-4-4h3c0-5.52 4.48-10 10-10V3zm0 18c4.97 0 9-4.03 9-9h-3l4-4 4 4h-3c0 5.52-4.48 10-10 10v-1z"/></svg></div>
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="#7c3aed" opacity="0.5"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="#7c3aed" stroke-width="1.5" fill="none" opacity="0.5"/></svg></div>
+      <div class="activity-spacer"></div>
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4"/></svg></div>
+    </div>
+    <!-- Diff Editor -->
+    <div class="editor-area">
+      <div class="tab-bar">
+        <div class="tab active" style="gap:8px;">
+          <span style="color:var(--warning);">M</span> app.tsx
+          <span style="font-size:10px;color:var(--text-muted);">+42 -18</span>
+          <span class="tab-close">×</span>
+        </div>
+        <div class="tab">
+          <span style="color:var(--green);">A</span> skeleton.tsx
+          <span class="tab-close">×</span>
+        </div>
+      </div>
+      <div class="diff-file-header">
+        <span>src/app.tsx</span>
+        <span style="display:flex;gap:12px;">
+          <button class="btn btn-primary btn-sm" style="font-size:11px;">🤖 AI 审查此文件</button>
+          <span style="color:var(--green);">+42</span>
+          <span style="color:var(--red);">-18</span>
+        </span>
+      </div>
+      <div class="diff-view">
+        <div class="diff-hunk">@@ -9,12 +9,18 @@ export default function UserProfile</div>
+        <div class="dl ctx"><span class="ln">9</span><span class="ln2">9</span><span class="code"><span class="kw">export default function</span> <span class="fn">UserProfile</span>({ <span class="var">userId</span>, <span class="var">onUpdate</span> }: <span class="type">Props</span>) {</span></div>
+        <div class="dl ctx"><span class="ln">10</span><span class="ln2">10</span><span class="code">  <span class="kw">const</span> [<span class="var">user</span>, <span class="fn">setUser</span>] = <span class="fn">useState</span>&lt;<span class="type">User</span> | <span class="type">null</span>&gt;(<span class="bl">null</span>);</span></div>
+        <div class="dl del"><span class="ln">11</span><span class="ln2"></span><span class="code"><span class="kw">const</span> [<span class="var">loading</span>, <span class="fn">setLoading</span>] = <span class="fn">useState</span>(<span class="bl">true</span>);</span></div>
+        <div class="dl add"><span class="ln"></span><span class="ln2">11</span><span class="code"><span class="kw">const</span> [<span class="var">loading</span>, <span class="fn">setLoading</span>] = <span class="fn">useState</span>(<span class="bl">true</span>);</span></div>
+        <div class="dl add"><span class="ln"></span><span class="ln2">12</span><span class="code"><span class="kw">const</span> [<span class="var">error</span>, <span class="fn">setError</span>] = <span class="fn">useState</span>&lt;<span class="type">string</span> | <span class="type">null</span>&gt;(<span class="bl">null</span>);</span></div>
+        <div class="dl ctx"><span class="ln">12</span><span class="ln2">13</span><span class="code"></span></div>
+        <div class="dl ctx"><span class="ln">13</span><span class="ln2">14</span><span class="code">  <span class="fn">useEffect</span>(() =&gt; {</span></div>
+        <div class="dl del"><span class="ln">14</span><span class="ln2"></span><span class="code">  <span class="fn">fetchUser</span>(<span class="var">userId</span>).<span class="fn">then</span>(<span class="var">data</span> =&gt; {</span></div>
+        <div class="dl del"><span class="ln">15</span><span class="ln2"></span><span class="code">    <span class="fn">setUser</span>(<span class="var">data</span>);</span></div>
+        <div class="dl del"><span class="ln">16</span><span class="ln2"></span><span class="code">    <span class="fn">setLoading</span>(<span class="bl">false</span>);</span></div>
+        <div class="dl del"><span class="ln">17</span><span class="ln2"></span><span class="code">  });</span></div>
+        <div class="dl add"><span class="ln"></span><span class="ln2">15</span><span class="code">  <span class="fn">fetchUser</span>(<span class="var">userId</span>)</span></div>
+        <div class="dl add"><span class="ln"></span><span class="ln2">16</span><span class="code">    .<span class="fn">then</span>(<span class="var">data</span> =&gt; <span class="fn">setUser</span>(<span class="var">data</span>))</span></div>
+        <div class="dl add"><span class="ln"></span><span class="ln2">17</span><span class="code">    .<span class="fn">catch</span>(<span class="var">e</span> =&gt; <span class="fn">setError</span>(<span class="var">e</span>.<span class="var">message</span>))</span></div>
+        <div class="dl add"><span class="ln"></span><span class="ln2">18</span><span class="code">    .<span class="fn">finally</span>(() =&gt; <span class="fn">setLoading</span>(<span class="bl">false</span>));</span></div>
+
+        <!-- AI Annotation -->
+        <div class="annotation">
+          <div class="ann-icon">⚠️</div>
+          <div class="ann-text">
+            <strong>建议：添加竞态条件处理</strong><br>
+            当 <code>userId</code> 快速变化时，旧请求的结果可能覆盖新请求。建议使用 <code>AbortController</code> 或添加请求版本号来处理竞态。
+            <div style="margin-top:6px;display:flex;gap:6px;">
+              <button class="btn btn-primary btn-sm" style="font-size:11px;">✨ 自动修复</button>
+              <button class="btn btn-ghost btn-sm" style="font-size:11px;">忽略</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dl ctx"><span class="ln">18</span><span class="ln2">19</span><span class="code">  }, [<span class="var">userId</span>]);</span></div>
+        <div class="dl ctx"><span class="ln">19</span><span class="ln2">20</span><span class="code"></span></div>
+        <div class="dl del"><span class="ln">20</span><span class="ln2"></span><span class="code"><span class="kw">if</span> (<span class="var">loading</span>) <span class="kw">return</span> &lt;<span class="type">Spinner</span> /&gt;;</span></div>
+        <div class="dl add"><span class="ln"></span><span class="ln2">21</span><span class="code"><span class="kw">if</span> (<span class="var">error</span>) <span class="kw">return</span> &lt;<span class="type">ErrorBanner</span> <span class="var">message</span>={<span class="var">error</span>} /&gt;;</span></div>
+        <div class="dl add"><span class="ln"></span><span class="ln2">22</span><span class="code"><span class="kw">if</span> (<span class="var">loading</span>) <span class="kw">return</span> &lt;<span class="type">SkeletonLoader</span> /&gt;;</span></div>
+
+        <div class="annotation ann-error">
+          <div class="ann-icon">🔴</div>
+          <div class="ann-text">
+            <strong>问题：错误边界缺失</strong><br>
+            <code>ErrorBanner</code> 组件在当前文件中未导入。同时建议在外层包裹 <code>ErrorBoundary</code> 来捕获渲染阶段的异常。
+            <div style="margin-top:6px;display:flex;gap:6px;">
+              <button class="btn btn-primary btn-sm" style="font-size:11px;">✨ 自动修复</button>
+              <button class="btn btn-ghost btn-sm" style="font-size:11px;">忽略</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dl ctx"><span class="ln">21</span><span class="ln2">23</span><span class="code"></span></div>
+        <div class="dl ctx"><span class="ln">22</span><span class="ln2">24</span><span class="code">  <span class="kw">return</span> (</span></div>
+        <div class="dl ctx"><span class="ln">23</span><span class="ln2">25</span><span class="code">    &lt;<span class="type">div</span> <span class="var">className</span>=<span class="str">"profile-card"</span>&gt;</span></div>
+      </div>
+    </div>
+    <!-- Review Panel -->
+    <div class="review-panel">
+      <div class="review-header">
+        <h3>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="#7c3aed" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="#7c3aed" stroke-width="1.5" fill="none"/></svg>
+          AI 审查报告
+        </h3>
+        <span class="badge badge-pro">DeepSeek-R1</span>
+      </div>
+      <div class="review-summary">
+        <div class="review-score">
+          <div class="score-circle">B+</div>
+          <div class="score-text">
+            <div class="title">代码质量: 良好</div>
+            <div class="detail">发现 4 个建议，1 个问题</div>
+          </div>
+        </div>
+        <div class="review-stats">
+          <div class="review-stat"><div class="num" style="color:var(--red);">1</div><div class="lbl">错误</div></div>
+          <div class="review-stat"><div class="num" style="color:var(--warning);">2</div><div class="lbl">警告</div></div>
+          <div class="review-stat"><div class="num" style="color:var(--info);">2</div><div class="lbl">建议</div></div>
+          <div class="review-stat"><div class="num" style="color:var(--green);">3</div><div class="lbl">通过</div></div>
+        </div>
+      </div>
+      <div class="review-items">
+        <div class="review-item">
+          <div class="ri-title"><span class="severity severity-error">错误</span>ErrorBanner 未导入</div>
+          <div class="ri-desc">使用了未导入的组件 ErrorBanner，会导致运行时错误。</div>
+          <div class="ri-line">📍 app.tsx:21</div>
+        </div>
+        <div class="review-item">
+          <div class="ri-title"><span class="severity severity-warn">警告</span>竞态条件风险</div>
+          <div class="ri-desc">useEffect 中的异步请求缺少取消机制，userId 变化时可能产生竞态。</div>
+          <div class="ri-line">📍 app.tsx:15-18</div>
+        </div>
+        <div class="review-item">
+          <div class="ri-title"><span class="severity severity-warn">警告</span>错误类型过于宽泛</div>
+          <div class="ri-desc">catch 中的 e.message 假设 error 是 Error 类型，但实际可能是其他类型。</div>
+          <div class="ri-line">📍 app.tsx:17</div>
+        </div>
+        <div class="review-item">
+          <div class="ri-title"><span class="severity severity-info">建议</span>使用骨架屏替代 Spinner</div>
+          <div class="ri-desc">推荐用 SkeletonLoader 替代简单的加载指示器，提升用户体验。</div>
+          <div class="ri-line">📍 app.tsx:22 ✅ 已实现</div>
+        </div>
+        <div class="review-item">
+          <div class="ri-title"><span class="severity severity-info">建议</span>添加重试机制</div>
+          <div class="ri-desc">建议在错误状态下提供重试按钮，允许用户重新加载数据。</div>
+          <div class="ri-line">📍 app.tsx:21</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div class="status-accent"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.5" fill="none"/></svg> LinkCode</div>
+    <div class="status-bar-left">
+      <div class="status-item">🔍 AI 审查完成</div>
+      <div class="status-item">分支: feat/user-profile</div>
+      <div class="status-item">🪙 ¥12.50</div>
+    </div>
+    <div class="status-bar-right"><div class="status-item">DeepSeek-R1 · 3,200 tokens</div></div>
+  </div>
+</div>
+<script>
+// Review items expand/collapse
+document.querySelectorAll('.review-item, [class*="ri-"]').forEach(item => {
+  if (item.querySelector('.ri-body, .ri-desc')) {
+    const body = item.querySelector('.ri-body, .ri-desc');
+    if (body) {
+      body.style.overflow = 'hidden';
+      body.style.transition = 'max-height 0.3s ease';
+      const header = item.querySelector('.ri-header, .ri-title');
+      if (header) {
+        header.style.cursor = 'pointer';
+        header.addEventListener('click', () => {
+          if (body.style.maxHeight === '0px') {
+            body.style.maxHeight = '500px';
+          } else {
+            body.style.maxHeight = '0px';
+          }
+        });
+      }
+    }
+  }
+});
+
+// Auto-fix button interaction
+document.querySelectorAll('.btn').forEach(btn => {
+  if (btn.textContent.includes('修复') || btn.textContent.includes('Fix')) {
+    btn.addEventListener('click', () => {
+      const orig = btn.textContent;
+      btn.textContent = '⏳ 修复中...';
+      btn.disabled = true;
+      setTimeout(() => {
+        btn.textContent = '✅ 已修复';
+        btn.style.background = 'var(--green)';
+        btn.style.color = 'white';
+      }, 1200);
+    });
+  }
+});
+
+// Stagger animation for review items
+document.querySelectorAll('.review-item').forEach((item, i) => {
+  item.style.opacity = '0';
+  item.style.transform = 'translateY(8px)';
+  item.style.transition = 'all 0.3s ease';
+  setTimeout(() => {
+    item.style.opacity = '1';
+    item.style.transform = 'translateY(0)';
+  }, 300 + i * 120);
+});
+</script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useVSCode } from '../composables/useVSCode'
+import { Dialog, Switch } from '../ui'
 
 interface ModelInfo {
   id: string
@@ -23,63 +24,33 @@ interface ModelGroup {
   models: ModelInfo[]
 }
 
-const MODEL_TO_GROUP: Record<string, string> = {
-  'claude-sonnet-4-6': 'Claude_aws', 'claude-opus-4-6': 'Claude_aws',
-  'claude-haiku-4-5-20251001': 'Claude_aws', 'claude-sonnet-4-5-20250929': 'Claude_aws',
-  'claude-opus-4-5-20251101': 'Claude_aws', 'claude-sonnet-4-20250514': 'Claude_aws',
-  'cursor-haik-4-5': 'Claude_aws', 'cursor-opu-4-5': 'Claude_aws', 'cursor-opu-4-6': 'Claude_aws',
-  'cursor-sonne-4': 'Claude_aws', 'cursor-sonne-4-5': 'Claude_aws', 'cursor-sonne-4-6': 'Claude_aws',
-  'deepseek-r1': 'deepseek_tencent', 'deepseek-v3': 'deepseek_tencent',
-  'deepseek-v3.1': 'deepseek_tencent', 'deepseek-v3.2': 'deepseek_tencent',
-  'gemini-2.5-pro': 'gemini_Google', 'gemini-2.5-flash': 'gemini_Google',
-  'gemini-2.5-flash-image': 'gemini_Google', 'gemini-2.5-flash-lite': 'gemini_Google',
-  'gemini-3-flash-preview': 'gemini_Google', 'gemini-3-pro-preview': 'gemini_Google',
-  'gemini-3.1-flash-lite-preview': 'gemini_Google', 'gemini-3.1-pro-preview': 'gemini_Google',
-  'gpt-5': 'gpt_Azure', 'gpt-5-codex': 'gpt_Azure', 'gpt-5.1': 'gpt_Azure',
-  'gpt-5.1-codex': 'gpt_Azure', 'gpt-5.2': 'gpt_Azure', 'gpt-5.2-codex': 'gpt_Azure',
-  'gpt-5.3-codex': 'gpt_Azure', 'gpt-5.4': 'gpt_Azure', 'gpt-5.4-pro': 'gpt_Azure',
-  'M2-her': 'MiniMax', 'MiniMax-M2.1': 'MiniMax', 'MiniMax-M2.1-highspeed': 'MiniMax',
-  'MiniMax-M2.5-highspeed': 'MiniMax', 'MiniMax-M2.7': 'MiniMax', 'MiniMax-M2.7-highspeed': 'MiniMax',
-  'hunyuan-2.0-instruct': 'hunyuan_tencent', 'hunyuan-2.0-thinking': 'hunyuan_tencent',
-  'glm-5': 'other_tencent', 'kimi-k2.5': 'other_tencent', 'minimax-m2.5': 'other_tencent',
-  'MiniMax-M2': 'scnet-low', 'MiniMax-M2.5': 'scnet-low',
-  'stepfun/step-3.5-flash:free': 'stepfun_openrouter',
-}
-
 const props = defineProps<{
   currentModel: string
   models: ModelInfo[]
   loading?: boolean
-  filterUnlocked?: boolean
   pricingData?: PricingItemProp[]
 }>()
 
-const emit = defineEmits<{
-  select: [modelId: string]
-  close: []
-}>()
+const emit = defineEmits<{ select: [modelId: string]; close: [] }>()
 
-const { postMessage, onMessage } = useVSCode()
+const { postMessage } = useVSCode()
 
 const searchQuery = ref('')
 const maxMode = ref(false)
-const groupTokenStatus = ref<Record<string, boolean>>({})
+const searchInputRef = ref<HTMLInputElement | null>(null)
 
-let cleanup: (() => void) | undefined
+const dialogOpen = ref(true)
+watch(dialogOpen, (v) => { if (!v) emit('close') })
 
 onMounted(() => {
-  postMessage({ type: 'getGroupTokenStatus' })
-  cleanup = onMessage((event: MessageEvent) => {
-    const msg = event.data as { type: string; tokens?: Record<string, boolean> }
-    if (msg.type === 'groupTokenStatus' && msg.tokens) {
-      groupTokenStatus.value = msg.tokens
-    }
-  })
+  nextTick(() => searchInputRef.value?.focus())
 })
 
-onUnmounted(() => { cleanup?.() })
+function openTokenSettings(): void {
+  postMessage({ type: 'openSettings', tab: 'token' })
+  emit('close')
+}
 
-/** Pricing lookup: model_name → { ratio, tags[], isFree } */
 const pricingMap = computed(() => {
   const map: Record<string, { ratio: number; tags: string[]; isFree: boolean }> = {}
   for (const item of (props.pricingData ?? [])) {
@@ -94,16 +65,12 @@ const pricingMap = computed(() => {
   return map
 })
 
-/** Important capability tags to display */
 const SHOWN_TAGS = new Set(['Reasoning', 'Vision', 'Tools', 'Audio'])
 
-/** Format ratio number: remove trailing zeros */
 function formatRatio(r: number): string {
-  // Show up to 3 decimal places, strip trailing zeros
   return r.toFixed(3).replace(/\.?0+$/, '')
 }
 
-/** Provider → display group config */
 const PROVIDER_GROUPS: Record<string, { title: string; emoji: string; order: number }> = {
   DeepSeek: { title: '国产模型（低成本）', emoji: '🇨🇳', order: 0 },
   Qwen:     { title: '国产模型（低成本）', emoji: '🇨🇳', order: 0 },
@@ -117,77 +84,65 @@ const PROVIDER_GROUPS: Record<string, { title: string; emoji: string; order: num
   Google:   { title: '国际模型（高质量）', emoji: '🌍', order: 1 },
 }
 
-function getIconClass(id: string): string {
-  if (id.startsWith('claude')) return 'cl'
-  if (id.startsWith('deepseek')) return 'ds'
-  if (id.startsWith('qwen')) return 'qw'
-  if (id.startsWith('glm') || id.startsWith('chatglm')) return 'glm'
-  if (id.startsWith('gpt') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4')) return 'gpt'
-  if (id.startsWith('gemini')) return 'ge'
-  if (id.startsWith('doubao')) return 'db'
-  if (id.startsWith('hunyuan')) return 'hy'
-  if (id.startsWith('kimi') || id.startsWith('moonshot')) return 'km'
-  if (id.startsWith('minimax') || id.startsWith('MiniMax') || id.startsWith('M2')) return 'mm'
+const ICON_COLORS: Record<string, string> = {
+  cl: '#D97706', ds: '#4F46E5', qw: '#0EA5E9', glm: '#E11D48',
+  gpt: '#10B981', ge: '#3B82F6', db: '#F97316', hy: '#8B5CF6',
+  km: '#06B6D4', mm: '#F59E0B', ai: '#6B7280',
+}
+
+function getIconKey(id: string): string {
+  const lower = id.toLowerCase()
+  if (lower.startsWith('claude') || lower.startsWith('cursor-')) return 'cl'
+  if (lower.startsWith('deepseek')) return 'ds'
+  if (lower.startsWith('qwen') || lower.startsWith('qwq')) return 'qw'
+  if (lower.startsWith('glm') || lower.startsWith('chatglm')) return 'glm'
+  if (lower.startsWith('gpt') || lower.startsWith('o1') || lower.startsWith('o3') || lower.startsWith('o4')) return 'gpt'
+  if (lower.startsWith('gemini')) return 'ge'
+  if (lower.startsWith('doubao')) return 'db'
+  if (lower.startsWith('hunyuan')) return 'hy'
+  if (lower.startsWith('kimi') || lower.startsWith('moonshot')) return 'km'
+  if (lower.startsWith('minimax') || lower.startsWith('m2')) return 'mm'
   return 'ai'
 }
 
+function getIconColor(id: string): string {
+  return ICON_COLORS[getIconKey(id)]
+}
+
 function getIconLabel(id: string): string {
-  if (id.startsWith('claude')) return 'CL'
-  if (id.startsWith('deepseek') || id.startsWith('DeepSeek')) return 'DS'
-  if (id.startsWith('qwen') || id.startsWith('Qwen') || id.startsWith('QwQ')) return 'QW'
-  if (id.startsWith('glm') || id.startsWith('chatglm')) return 'GL'
-  if (id.startsWith('gpt') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4')) return 'GP'
-  if (id.startsWith('gemini')) return 'GE'
-  if (id.startsWith('doubao')) return 'DB'
-  if (id.startsWith('hunyuan')) return 'HY'
-  if (id.startsWith('kimi') || id.startsWith('moonshot')) return 'KM'
-  if (id.startsWith('minimax') || id.startsWith('MiniMax') || id.startsWith('M2')) return 'MM'
+  const lower = id.toLowerCase()
+  if (lower.startsWith('claude') || lower.startsWith('cursor-')) return 'CL'
+  if (lower.startsWith('deepseek')) return 'DS'
+  if (lower.startsWith('qwen') || lower.startsWith('qwq')) return 'QW'
+  if (lower.startsWith('glm') || lower.startsWith('chatglm')) return 'GL'
+  if (lower.startsWith('gpt') || lower.startsWith('o1') || lower.startsWith('o3') || lower.startsWith('o4')) return 'GP'
+  if (lower.startsWith('gemini')) return 'GE'
+  if (lower.startsWith('doubao')) return 'DB'
+  if (lower.startsWith('hunyuan')) return 'HY'
+  if (lower.startsWith('kimi') || lower.startsWith('moonshot')) return 'KM'
+  if (lower.startsWith('minimax') || lower.startsWith('m2')) return 'MM'
   return 'AI'
 }
 
-function isModelUnlocked(modelId: string): boolean {
-  const group = MODEL_TO_GROUP[modelId]
-  if (!group) return true // Unknown models are considered unlocked
-  return groupTokenStatus.value[group] === true
-}
-
-function getModelGroup(modelId: string): string | undefined {
-  return MODEL_TO_GROUP[modelId]
-}
-
-/** Build grouped model list from flat models array */
 const modelGroups = computed<ModelGroup[]>(() => {
   const groupMap = new Map<string, ModelInfo[]>()
-
   for (const model of props.models) {
-    // Feature 6: if filterUnlocked, hide locked models
-    if (props.filterUnlocked && !isModelUnlocked(model.id)) continue
-
     const groupConfig = PROVIDER_GROUPS[model.provider]
     const groupKey = groupConfig?.title ?? '其他模型'
-    if (!groupMap.has(groupKey)) {
-      groupMap.set(groupKey, [])
-    }
+    if (!groupMap.has(groupKey)) groupMap.set(groupKey, [])
     groupMap.get(groupKey)!.push(model)
   }
-
   const groups: ModelGroup[] = []
   for (const [title, models] of groupMap) {
     const firstModel = models[0]
     const config = firstModel ? PROVIDER_GROUPS[firstModel.provider] : undefined
-    groups.push({
-      title,
-      emoji: config?.emoji ?? '🤖',
-      models,
-    })
+    groups.push({ title, emoji: config?.emoji ?? '🤖', models })
   }
-
   groups.sort((a, b) => {
     const orderA = a.title.includes('国产') ? 0 : a.title.includes('国际') ? 1 : 2
     const orderB = b.title.includes('国产') ? 0 : b.title.includes('国际') ? 1 : 2
     return orderA - orderB
   })
-
   return groups
 })
 
@@ -201,23 +156,13 @@ const filteredGroups = computed(() => {
         (m) =>
           m.label.toLowerCase().includes(q) ||
           m.id.toLowerCase().includes(q) ||
-          m.provider.toLowerCase().includes(q)
+          m.provider.toLowerCase().includes(q),
       ),
     }))
     .filter((g) => g.models.length > 0)
 })
 
 function handleSelect(modelId: string) {
-  if (modelId === 'auto') {
-    emit('select', modelId)
-    return
-  }
-  if (!isModelUnlocked(modelId)) {
-    const group = getModelGroup(modelId)
-    postMessage({ type: 'openSettings', tab: 'token', highlightGroup: group })
-    emit('close')
-    return
-  }
   emit('select', modelId)
 }
 
@@ -233,28 +178,33 @@ function getTagClass(tag?: string): string {
 </script>
 
 <template>
-  <div class="selector-overlay" @click.self="emit('close')">
-    <div class="selector-panel">
-      <!-- Search header -->
-      <div class="selector-header">
-        <div class="selector-search">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="搜索模型..."
-            class="selector-search-input"
-            autofocus
-          >
-        </div>
+  <Dialog v-model:open="dialogOpen" size="md" title="选择模型" class="ms-dialog">
+    <!-- Empty state -->
+    <div v-if="!loading && models.length === 0" class="ms-empty">
+      <div class="ms-empty-icon">🔐</div>
+      <div class="ms-empty-title">尚未配置任何 Token</div>
+      <div class="ms-empty-desc">配置 Token 后，系统将从 Smoothlink 动态拉取该 Token 可用的所有模型。</div>
+      <button class="ms-empty-btn" @click="openTokenSettings">前往配置 Token</button>
+    </div>
+
+    <!-- Inline search + list -->
+    <template v-else>
+      <div class="ms-search-bar">
+        <svg class="ms-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input
+          ref="searchInputRef"
+          v-model="searchQuery"
+          class="ms-search-input"
+          type="text"
+          placeholder="搜索模型..."
+        />
+        <span v-if="searchQuery" class="ms-search-clear" @click="searchQuery = ''">×</span>
       </div>
 
-      <!-- Model list -->
-      <div class="selector-body">
-        <!-- Auto routing row -->
+      <div class="ms-list">
+        <!-- Auto-route -->
         <button
           class="auto-route-row"
           :class="{ selected: currentModel === 'auto' }"
@@ -281,25 +231,18 @@ function getTagClass(tag?: string): string {
           </div>
         </template>
 
-        <!-- Model groups -->
+        <!-- Grouped model list -->
         <template v-else>
-          <div
-            v-for="group in filteredGroups"
-            :key="group.title"
-          >
+          <template v-for="group in filteredGroups" :key="group.title">
             <div class="group-title">{{ group.emoji }} {{ group.title }}</div>
             <button
               v-for="model in group.models"
               :key="model.id"
               class="model-row"
-              :class="{
-                selected: model.id === currentModel,
-                locked: !isModelUnlocked(model.id),
-              }"
-              :title="isModelUnlocked(model.id) ? '' : `需要配置 ${getModelGroup(model.id)} 令牌`"
+              :class="{ selected: model.id === currentModel }"
               @click="handleSelect(model.id)"
             >
-              <span class="model-icon-badge" :class="getIconClass(model.id)">
+              <span class="model-icon-badge" :style="{ background: getIconColor(model.id) }">
                 {{ getIconLabel(model.id) }}
               </span>
               <div class="model-info">
@@ -307,14 +250,11 @@ function getTagClass(tag?: string): string {
                   {{ model.label }}
                   <span v-if="pricingMap[model.id]?.isFree" class="model-ratio model-ratio-free">免费</span>
                   <span v-else-if="pricingMap[model.id]" class="model-ratio">x{{ formatRatio(pricingMap[model.id].ratio) }}</span>
-                  <span v-if="!isModelUnlocked(model.id)" class="lock-icon">🔒</span>
                   <span
-                    v-if="model.tag && isModelUnlocked(model.id)"
+                    v-if="model.tag"
                     class="model-tag"
                     :class="getTagClass(model.tag)"
-                  >
-                    {{ model.tag }}
-                  </span>
+                  >{{ model.tag }}</span>
                   <span
                     v-for="tag in (pricingMap[model.id]?.tags ?? []).filter(t => SHOWN_TAGS.has(t))"
                     :key="tag"
@@ -326,34 +266,267 @@ function getTagClass(tag?: string): string {
               <svg
                 v-if="model.id === currentModel"
                 class="check-icon"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+                width="14" height="14"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
               >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </button>
+          </template>
+
+          <div v-if="filteredGroups.length === 0 && searchQuery" class="ms-no-results">
+            无匹配结果
           </div>
         </template>
       </div>
+    </template>
 
-      <!-- Footer with Max Mode -->
-      <div class="selector-footer">
-        <div class="max-mode">
-          <span>⚡ Max Mode</span>
-          <button
-            class="toggle-switch"
-            :class="{ active: maxMode }"
-            @click="maxMode = !maxMode"
-          />
-        </div>
-        <span class="max-mode-hint">使用最大上下文窗口</span>
+    <template #footer>
+      <div class="max-mode">
+        <span>⚡ Max Mode</span>
+        <Switch v-model="maxMode" />
       </div>
-    </div>
-  </div>
+      <span class="max-mode-hint">使用最大上下文窗口</span>
+    </template>
+  </Dialog>
 </template>
+
+<style scoped>
+.ms-dialog :deep(.ui-dialog__body) { padding: 0; display: flex; flex-direction: column; }
+.ms-dialog :deep(.ui-dialog__content) { height: min(560px, calc(100vh - 24px)); }
+
+/* ---- Search bar ---- */
+.ms-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--lcc-border-subtle);
+  flex-shrink: 0;
+}
+.ms-search-icon {
+  color: var(--lcc-text-subtle);
+  flex-shrink: 0;
+}
+.ms-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--lcc-text);
+  font-size: 13px;
+  font-family: inherit;
+}
+.ms-search-input::placeholder { color: var(--lcc-text-subtle); }
+.ms-search-clear {
+  cursor: pointer;
+  color: var(--lcc-text-subtle);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.ms-search-clear:hover { background: var(--lcc-bg-hover); color: var(--lcc-text); }
+
+/* ---- Scrollable list ---- */
+.ms-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* ---- Empty state ---- */
+.ms-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  text-align: center;
+  gap: 10px;
+}
+.ms-empty-icon { font-size: 28px; opacity: 0.85; }
+.ms-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--lcc-text);
+}
+.ms-empty-desc {
+  font-size: 12px;
+  color: var(--lcc-text-muted);
+  line-height: 1.6;
+  max-width: 320px;
+}
+.ms-empty-btn {
+  margin-top: 6px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: var(--lcc-radius-md);
+  background: var(--lcc-accent);
+  color: var(--lcc-accent-fg, #fff);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 120ms;
+}
+.ms-empty-btn:hover { filter: brightness(1.08); }
+
+.ms-no-results {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--lcc-text-subtle);
+}
+
+/* ---- Group titles ---- */
+.group-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--lcc-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 10px 16px 4px;
+}
+
+/* ---- Model rows ---- */
+.model-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 120ms;
+  position: relative;
+  width: 100%;
+  background: transparent;
+  border: none;
+  text-align: left;
+  color: var(--lcc-text);
+}
+.model-row:hover { background: var(--lcc-bg-hover); }
+.model-row.selected { background: var(--lcc-bg-hover); }
+.model-row.selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  background: var(--lcc-accent);
+  border-radius: 0 2px 2px 0;
+}
+
+/* ---- Auto-route row ---- */
+.auto-route-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: color-mix(in srgb, var(--lcc-accent) 14%, transparent);
+  cursor: pointer;
+  transition: background 120ms;
+  width: 100%;
+  border: none;
+  text-align: left;
+  color: var(--lcc-accent);
+}
+.auto-route-row:hover { background: color-mix(in srgb, var(--lcc-accent) 18%, transparent); }
+.auto-route-row.selected { background: color-mix(in srgb, var(--lcc-accent) 20%, transparent); }
+.auto-route-name {
+  font-size: 13px;
+  color: var(--lcc-accent);
+  font-weight: 600;
+}
+
+/* ---- Footer ---- */
+.max-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--lcc-text-muted);
+}
+.max-mode-hint {
+  font-size: 11px;
+  color: var(--lcc-text-subtle);
+}
+
+/* ---- Model cells ---- */
+.model-icon-badge {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--lcc-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.model-info { flex: 1; min-width: 0; }
+.model-name {
+  font-size: 13px;
+  color: var(--lcc-text);
+}
+.model-tag {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+  font-weight: 500;
+}
+.tag-green { background: rgba(34, 197, 94, 0.12); color: var(--lcc-success); }
+.tag-blue { background: rgba(59, 130, 246, 0.12); color: var(--lcc-info); }
+.tag-purple { background: color-mix(in srgb, var(--lcc-accent) 14%, transparent); color: var(--lcc-accent); }
+.tag-default { background: rgba(255, 255, 255, 0.06); color: var(--lcc-text-muted); }
+
+.model-price {
+  font-size: 11px;
+  color: var(--lcc-text-subtle);
+}
+.model-ratio {
+  font-size: 10px;
+  color: var(--lcc-text);
+  opacity: 0.5;
+  margin-left: 4px;
+  font-family: monospace;
+}
+.model-ratio-free {
+  opacity: 1;
+  color: var(--lcc-success, #22c55e);
+  font-weight: 600;
+  font-family: inherit;
+}
+.model-cap-tag {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--vscode-badge-background, rgba(100,100,100,0.3));
+  color: var(--vscode-badge-foreground, #ccc);
+  margin-left: 2px;
+  vertical-align: middle;
+}
+.check-icon { color: var(--lcc-accent); flex-shrink: 0; }
+
+/* ---- Skeleton ---- */
+.skeleton-row { pointer-events: none; opacity: 0.5; }
+.skeleton-icon {
+  background: var(--lcc-bg-elevated) !important;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+.skeleton-text {
+  border-radius: 4px;
+  background: var(--lcc-bg-elevated);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+.skeleton-name { width: 140px; height: 14px; margin-bottom: 4px; }
+.skeleton-detail { width: 200px; height: 11px; }
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+</style>

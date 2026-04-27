@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode — 成本仪表板</title>
+<style>
+/* === LinkCode Design Tokens — Linear-inspired === */
+:root {
+  /* Background layers */
+  --bg-app: #0f0f0f;
+  --bg-surface: #141414;
+  --bg-elevated: #1c1c1c;
+  --bg-hover: #232323;
+  --bg-active: #2a2a2a;
+  --bg-border: #2e2e2e;
+
+  /* Brand purple */
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-subtle: rgba(124,58,237,0.12);
+  --accent-text: #a78bfa;
+
+  /* Text */
+  --text-primary: #e2e2e2;
+  --text-secondary: #888888;
+  --text-tertiary: #555555;
+  --text-accent: #a78bfa;
+
+  /* Status */
+  --green: #22c55e;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --blue: #3b82f6;
+
+  /* Fonts */
+  --font-ui: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-code: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
+  --font-size: 13px;
+  --line-height: 1.5;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+}
+
+/* === Reset & Base === */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  font-family: var(--font-ui);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  color: var(--text-primary);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* === Scrollbar === */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #444; }
+
+/* === Typography === */
+h1 { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+h2 { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+h3 { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+p { color: var(--text-secondary); font-size: 13px; }
+a { color: var(--accent-text); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: var(--font-code); font-size: 12px; }
+
+/* === Buttons === */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 6px 12px; border-radius: var(--radius-md); font-size: 12px; font-weight: 500;
+  border: 1px solid var(--bg-border); background: var(--bg-elevated); color: var(--text-primary);
+  cursor: pointer; transition: all var(--duration-fast) var(--ease); user-select: none;
+  font-family: var(--font-ui); line-height: 1;
+}
+.btn:hover { background: var(--bg-hover); border-color: #3a3a3a; }
+.btn:active { background: var(--bg-active); transform: scale(0.97); }
+
+.btn-primary {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-primary:active { background: #5b21b6; }
+
+.btn-ghost {
+  background: transparent; border-color: transparent; color: var(--text-secondary);
+}
+.btn-ghost:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.btn-sm { padding: 4px 8px; font-size: 11px; }
+.btn-lg { padding: 8px 16px; font-size: 13px; }
+
+.btn-success { background: var(--green); border-color: var(--green); color: #fff; }
+.btn-danger { background: var(--red); border-color: var(--red); color: #fff; }
+
+.btn:disabled, .btn[disabled] {
+  opacity: 0.4; cursor: not-allowed; pointer-events: none;
+}
+
+/* === Input === */
+.input {
+  width: 100%; padding: 8px 12px; background: var(--bg-elevated); border: 1px solid var(--bg-border);
+  border-radius: var(--radius-md); color: var(--text-primary); font-size: 13px;
+  font-family: var(--font-ui); outline: none; transition: border-color var(--duration-fast) var(--ease);
+}
+.input:focus { border-color: var(--accent); }
+.input::placeholder { color: var(--text-tertiary); }
+
+.input-mono { font-family: var(--font-code); font-size: 12px; letter-spacing: 0.02em; }
+
+/* === Toggle === */
+.toggle {
+  width: 36px; height: 20px; border-radius: 10px; background: #333; cursor: pointer;
+  position: relative; transition: background var(--duration-fast) var(--ease);
+  border: none; padding: 0;
+}
+.toggle::after {
+  content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%;
+  background: #888; top: 2px; left: 2px; transition: all var(--duration-fast) var(--ease);
+}
+.toggle.active { background: var(--accent); }
+.toggle.active::after { left: 18px; background: #fff; }
+
+/* === Badge === */
+.badge {
+  display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px;
+  font-size: 10px; font-weight: 500; background: var(--accent-subtle); color: var(--accent-text);
+}
+.badge-green { background: rgba(34,197,94,0.12); color: var(--green); }
+.badge-red { background: rgba(239,68,68,0.12); color: var(--red); }
+.badge-yellow { background: rgba(245,158,11,0.12); color: var(--yellow); }
+.badge-blue { background: rgba(59,130,246,0.12); color: var(--blue); }
+
+/* === Chip === */
+.chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+  border-radius: var(--radius-sm); font-size: 12px; cursor: default;
+}
+.chip-file { background: #1e3a5f; color: #60a5fa; }
+.chip-workspace { background: #2d1f4e; color: #a78bfa; }
+.chip-docs { background: #1f3d2d; color: #4ade80; }
+.chip-web { background: #3d2d1f; color: #fb923c; }
+
+/* === Divider === */
+.divider {
+  height: 1px; background: var(--bg-border); margin: var(--space-4) 0;
+}
+
+/* === Code Block === */
+.code-block {
+  background: #0f0f0f; border: 1px solid var(--bg-border); border-radius: var(--radius-md);
+  overflow: hidden; margin: 8px 0;
+}
+.code-block-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 12px; background: var(--bg-surface); border-bottom: 1px solid var(--bg-border);
+  height: 28px;
+}
+.code-block-lang {
+  font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; font-weight: 500;
+}
+.code-block-actions { display: flex; gap: 4px; }
+.code-block-actions .btn { font-size: 11px; padding: 2px 8px; border: none; background: transparent; }
+.code-block-actions .btn:hover { background: var(--bg-hover); }
+.code-block pre {
+  padding: 12px 16px; overflow-x: auto; font-family: var(--font-code);
+  font-size: 12px; line-height: 1.6; color: var(--text-primary); margin: 0;
+}
+
+/* === Layout Helpers === */
+.flex { display: flex; }
+.flex-col { display: flex; flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.gap-1 { gap: 4px; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+.gap-6 { gap: 24px; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.flex-1 { flex: 1; }
+.flex-shrink-0 { flex-shrink: 0; }
+.overflow-hidden { overflow: hidden; }
+.overflow-auto { overflow-y: auto; }
+.text-center { text-align: center; }
+.relative { position: relative; }
+.absolute { position: absolute; }
+
+/* === VS Code Frame === */
+.vscode-frame {
+  width: 100%; height: 100vh; display: flex; flex-direction: column;
+  background: var(--bg-app); overflow: hidden;
+}
+.vscode-titlebar {
+  height: 36px; background: var(--bg-surface); display: flex; align-items: center;
+  padding: 0 12px; gap: 8px; flex-shrink: 0; border-bottom: 1px solid var(--bg-border);
+}
+.titlebar-dot { width: 12px; height: 12px; border-radius: 50%; }
+.titlebar-dot.close { background: #ff5f57; }
+.titlebar-dot.minimize { background: #ffbd2e; }
+.titlebar-dot.maximize { background: #28c840; }
+.titlebar-title { flex: 1; text-align: center; font-size: 12px; color: var(--text-tertiary); }
+
+.vscode-body { flex: 1; display: flex; overflow: hidden; }
+.vscode-sidebar {
+  width: 48px; background: var(--bg-surface); border-right: 1px solid var(--bg-border);
+  display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 4px; flex-shrink: 0;
+}
+.sidebar-icon {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  color: var(--text-tertiary); cursor: pointer; border-radius: var(--radius-sm);
+  transition: all var(--duration-fast) var(--ease);
+}
+.sidebar-icon:hover { color: var(--text-primary); background: var(--bg-hover); }
+.sidebar-icon.active { color: var(--accent-text); }
+
+.vscode-editor {
+  flex: 1; background: var(--bg-app); display: flex; flex-direction: column; overflow: hidden;
+}
+.editor-tabs {
+  display: flex; align-items: center; height: 35px; background: var(--bg-surface);
+  border-bottom: 1px solid var(--bg-border); overflow-x: auto; flex-shrink: 0;
+}
+.editor-tab {
+  display: flex; align-items: center; gap: 6px; padding: 0 16px; height: 100%;
+  font-size: 12px; color: var(--text-secondary); cursor: pointer; border-right: 1px solid var(--bg-border);
+  white-space: nowrap; transition: all var(--duration-fast) var(--ease);
+}
+.editor-tab:hover { background: var(--bg-hover); }
+.editor-tab.active { color: var(--text-primary); background: var(--bg-app); border-bottom: 1px solid var(--accent); }
+
+.editor-content { flex: 1; overflow: auto; padding: 0; position: relative; }
+
+.vscode-chat {
+  width: 380px; background: var(--bg-surface); border-left: 1px solid var(--bg-border);
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+.chat-header {
+  height: 36px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--bg-border); flex-shrink: 0;
+}
+
+.vscode-statusbar {
+  height: 24px; background: var(--bg-surface); border-top: 1px solid var(--bg-border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 10px;
+  font-size: 11px; flex-shrink: 0;
+}
+.statusbar-left, .statusbar-right { display: flex; align-items: center; gap: 12px; }
+.statusbar-item {
+  display: flex; align-items: center; gap: 4px; color: var(--text-secondary); cursor: pointer;
+  transition: color var(--duration-fast);
+}
+.statusbar-item:hover { color: var(--text-primary); }
+
+/* === Animations === */
+@keyframes fadeIn {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; } 50% { opacity: 0; }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; } 50% { opacity: 0.4; }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); } to { transform: rotate(360deg); }
+}
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); }
+}
+@keyframes progressGrow {
+  from { width: 0; } to { width: var(--target-width, 100%); }
+}
+@keyframes ripple {
+  0% { transform: scale(0); opacity: 0.5; }
+  100% { transform: scale(4); opacity: 0; }
+}
+
+.animate-fade { animation: fadeIn 0.3s var(--ease); }
+.animate-slide-up { animation: slideUp 0.3s var(--ease); }
+.animate-slide-down { animation: slideDown 0.3s var(--ease); }
+.animate-blink { animation: blink 1s step-end infinite; }
+.animate-pulse { animation: pulse 1.5s ease-in-out infinite; }
+.animate-spin { animation: spin 1s linear infinite; }
+.animate-bounce { animation: bounce 0.6s ease-in-out infinite; }
+
+/* === Thinking Dots === */
+.thinking-dots { display: inline-flex; gap: 3px; align-items: center; }
+.thinking-dots span {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--accent-text);
+  animation: bounce 1.2s ease-in-out infinite;
+}
+.thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+/* === Streaming Cursor === */
+.streaming-cursor::after {
+  content: '▊'; color: var(--accent-text); font-weight: bold;
+  animation: blink 1s step-end infinite; margin-left: 1px;
+}
+
+/* === Ripple Effect === */
+.ripple-container { position: relative; overflow: hidden; }
+.ripple-effect {
+  position: absolute; border-radius: 50%; background: rgba(255,255,255,0.15);
+  width: 20px; height: 20px; animation: ripple 0.5s ease-out forwards;
+  pointer-events: none;
+}
+
+/* === Model Icon === */
+.model-icon {
+  width: 20px; height: 20px; border-radius: var(--radius-sm); display: inline-flex;
+  align-items: center; justify-content: center; font-size: 9px; font-weight: 700;
+  color: #fff; flex-shrink: 0;
+}
+.model-icon.ds { background: #4F46E5; }
+.model-icon.qw { background: #0EA5E9; }
+.model-icon.db { background: #F97316; }
+.model-icon.cl { background: #D97706; }
+.model-icon.gpt { background: #10B981; }
+.model-icon.glm { background: #E11D48; }
+
+/* === Progress Bar === */
+.progress-bar {
+  height: 4px; background: var(--bg-active); border-radius: 2px; overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%; border-radius: 2px; transition: width 0.8s var(--ease);
+  background: var(--accent);
+}
+.progress-bar-fill.green { background: var(--green); }
+.progress-bar-fill.yellow { background: var(--yellow); }
+.progress-bar-fill.red { background: var(--red); }
+
+/* === Tab Nav === */
+.tab-nav { display: flex; gap: 0; border-bottom: 1px solid var(--bg-border); }
+.tab-item {
+  padding: 8px 16px; font-size: 12px; color: var(--text-secondary); cursor: pointer;
+  border-bottom: 2px solid transparent; transition: all var(--duration-fast) var(--ease);
+}
+.tab-item:hover { color: var(--text-primary); }
+.tab-item.active { color: var(--accent-text); border-bottom-color: var(--accent); }
+
+/* === Search Box === */
+.search-box {
+  display: flex; align-items: center; gap: 8px; padding: 0 12px;
+  background: var(--bg-elevated); border: 1px solid var(--bg-border);
+  border-radius: var(--radius-md);
+}
+.search-box svg { color: var(--text-tertiary); flex-shrink: 0; }
+.search-box input {
+  flex: 1; border: none; background: transparent; color: var(--text-primary);
+  font-size: 13px; padding: 8px 0; outline: none; font-family: var(--font-ui);
+}
+.search-box input::placeholder { color: var(--text-tertiary); }
+
+/* Common page wrapper */
+.page-wrap {
+  width: 100%; min-height: 100vh; display: flex; flex-direction: column;
+}
+
+</style>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+.dashboard { max-width:900px; margin:0 auto; padding:32px 24px; }
+.dash-header { margin-bottom:24px; }
+.dash-header h1 { font-size:16px; margin-bottom:4px; }
+.summary-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:24px; }
+.sum-card { padding:16px; background:var(--bg-surface); border:1px solid var(--bg-border); border-radius:var(--radius-lg); }
+.sum-card .label { font-size:11px; color:var(--text-tertiary); margin-bottom:6px; }
+.sum-card .value { font-size:20px; font-weight:600; }
+.sum-card .sub { font-size:11px; color:var(--text-tertiary); margin-top:4px; }
+.budget-section { padding:16px; background:var(--bg-surface); border:1px solid var(--bg-border); border-radius:var(--radius-lg); margin-bottom:16px; }
+.budget-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.budget-bar { height:8px; background:var(--bg-active); border-radius:4px; overflow:hidden; }
+.budget-fill { height:100%; border-radius:4px; width:0; transition:width 1s var(--ease); }
+.model-section { padding:16px; background:var(--bg-surface); border:1px solid var(--bg-border); border-radius:var(--radius-lg); margin-bottom:16px; }
+.model-usage-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--bg-border); }
+.model-usage-row:last-child { border-bottom:none; }
+.model-usage-bar { flex:1; height:4px; background:var(--bg-active); border-radius:2px; overflow:hidden; }
+.model-usage-fill { height:100%; border-radius:2px; width:0; transition:width 1s var(--ease); }
+.model-cost { font-size:12px; color:var(--text-primary); width:60px; text-align:right; }
+.savings-card { padding:16px; background:rgba(34,197,94,0.06); border:1px solid rgba(34,197,94,0.15); border-radius:var(--radius-lg); }
+.savings-card h3 { color:var(--green); font-size:13px; margin-bottom:8px; }
+.savings-compare { display:flex; gap:12px; margin-top:8px; }
+.savings-bar-wrap { flex:1; }
+.savings-bar-label { font-size:11px; color:var(--text-secondary); margin-bottom:4px; }
+.savings-bar { height:6px; background:var(--bg-active); border-radius:3px; overflow:hidden; }
+.savings-bar-fill { height:100%; border-radius:3px; transition:width 1s var(--ease); }
+.expand-section { display:none; padding:16px; background:var(--bg-surface); border:1px solid var(--bg-border); border-radius:var(--radius-lg); margin-bottom:16px; }
+.expand-section.show { display:block; animation:slideUp 0.3s var(--ease); }
+</style>
+<style>
+/* === Back to Index Nav === */
+.back-to-index {
+  position: fixed; top: 12px; right: 12px; z-index: 9999;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; background: rgba(28,28,28,0.9);
+  border: 1px solid #2e2e2e; border-radius: 6px;
+  color: #a78bfa; font-size: 11px; font-weight: 500;
+  cursor: pointer; backdrop-filter: blur(8px);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none; font-family: -apple-system, 'Segoe UI', sans-serif;
+  opacity: 0.7;
+}
+.back-to-index:hover { opacity: 1; background: rgba(44,44,44,0.95); border-color: #7c3aed; text-decoration: none; }
+.back-to-index svg { width: 14px; height: 14px; }
+
+/* === Fullscreen Standalone Fix === */
+html { width: 100%; min-height: 100vh; }
+body { width: 100%; min-height: 100vh; }
+</style>
+</head>
+<body>
+<div class="dashboard">
+  <div class="dash-header">
+    <h1>📊 成本仪表板</h1>
+    <p>实时查看 Token 使用和成本分析</p>
+  </div>
+  <div class="tab-nav" id="tabNav">
+    <div class="tab-item active" data-tab="today">今日</div>
+    <div class="tab-item" data-tab="week">本周</div>
+    <div class="tab-item" data-tab="month">本月</div>
+  </div>
+  <div style="height:16px"></div>
+  <div class="summary-cards">
+    <div class="sum-card">
+      <div class="label">当前余额</div>
+      <div class="value" style="color:var(--green)">¥38.50</div>
+      <div class="sub">Pro 计划</div>
+    </div>
+    <div class="sum-card">
+      <div class="label" id="periodLabel">今日消耗</div>
+      <div class="value" id="periodCost">¥3.20</div>
+      <div class="sub" id="periodCalls">68 次调用</div>
+    </div>
+    <div class="sum-card">
+      <div class="label">累计节省</div>
+      <div class="value" style="color:var(--green)" id="savingsTotal">¥48.30</div>
+      <div class="sub">vs 全用 GPT-4o</div>
+    </div>
+  </div>
+  <div class="budget-section">
+    <div class="budget-header">
+      <span style="font-size:12px;font-weight:500">月度预算</span>
+      <span style="font-size:12px;color:var(--text-secondary)">¥24.50 / ¥80.00</span>
+    </div>
+    <div class="budget-bar">
+      <div class="budget-fill" id="budgetFill" style="background:var(--accent)"></div>
+    </div>
+    <div style="font-size:11px;color:var(--text-tertiary);margin-top:6px">使用 30.6%，预计月底消耗 ¥52.00</div>
+  </div>
+  <div class="model-section">
+    <h3 style="font-size:13px;margin-bottom:12px">模型使用分布</h3>
+    <div class="model-usage-row">
+      <span class="model-icon ds" style="width:18px;height:18px;font-size:8px">DS</span>
+      <span style="font-size:12px;color:var(--text-secondary);width:120px">DeepSeek-V3</span>
+      <div class="model-usage-bar"><div class="model-usage-fill" id="ds-bar" style="background:#4F46E5"></div></div>
+      <span class="model-cost">¥1.20</span>
+    </div>
+    <div class="model-usage-row">
+      <span class="model-icon qw" style="width:18px;height:18px;font-size:8px">QW</span>
+      <span style="font-size:12px;color:var(--text-secondary);width:120px">Qwen2.5-Coder</span>
+      <div class="model-usage-bar"><div class="model-usage-fill" id="qw-bar" style="background:#0EA5E9"></div></div>
+      <span class="model-cost">¥0.80</span>
+    </div>
+    <div class="model-usage-row">
+      <span class="model-icon cl" style="width:18px;height:18px;font-size:8px">CL</span>
+      <span style="font-size:12px;color:var(--text-secondary);width:120px">Claude Sonnet 4</span>
+      <div class="model-usage-bar"><div class="model-usage-fill" id="cl-bar" style="background:#D97706"></div></div>
+      <span class="model-cost">¥0.90</span>
+    </div>
+    <div class="model-usage-row">
+      <span class="model-icon gpt" style="width:18px;height:18px;font-size:8px">GP</span>
+      <span style="font-size:12px;color:var(--text-secondary);width:120px">GPT-4o</span>
+      <div class="model-usage-bar"><div class="model-usage-fill" id="gpt-bar" style="background:#10B981"></div></div>
+      <span class="model-cost">¥0.30</span>
+    </div>
+  </div>
+  <div class="savings-card">
+    <h3>💰 智能路由节省对比</h3>
+    <div class="savings-compare">
+      <div class="savings-bar-wrap">
+        <div class="savings-bar-label">实际消费 ¥3.20</div>
+        <div class="savings-bar"><div class="savings-bar-fill" id="actualBar" style="background:var(--green)"></div></div>
+      </div>
+      <div class="savings-bar-wrap">
+        <div class="savings-bar-label">如全用 GPT-4o ¥38.40</div>
+        <div class="savings-bar"><div class="savings-bar-fill" id="hypothBar" style="background:var(--text-tertiary)"></div></div>
+      </div>
+    </div>
+    <p style="margin-top:8px;font-size:12px;color:var(--green)">🎉 今日节省 92%（¥35.20）</p>
+  </div>
+  <button class="btn w-full" style="margin-top:16px" id="expandBtn" onclick="toggleExpand()">查看完整报告 ↓</button>
+  <div class="expand-section" id="expandSection">
+    <h3 style="font-size:13px;margin-bottom:12px">详细调用记录</h3>
+    <div style="font-size:12px;color:var(--text-secondary)">
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bg-border)"><span>14:32 — Chat · DeepSeek-V3</span><span>¥0.002</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bg-border)"><span>14:28 — 补全 × 12 · DeepSeek-Coder</span><span>¥0.006</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bg-border)"><span>14:15 — Chat · Claude Sonnet 4</span><span>¥0.018</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bg-border)"><span>13:52 — 代码审查 · Claude Sonnet 4</span><span>¥0.032</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0"><span>13:40 — 补全 × 28 · DeepSeek-Coder</span><span>¥0.014</span></div>
+    </div>
+  </div>
+</div>
+<script>
+lucide.createIcons();
+
+// Animate progress bars on load
+setTimeout(() => {
+  document.getElementById('budgetFill').style.width = '30.6%';
+  document.getElementById('ds-bar').style.width = '65%';
+  document.getElementById('qw-bar').style.width = '42%';
+  document.getElementById('cl-bar').style.width = '48%';
+  document.getElementById('gpt-bar').style.width = '16%';
+  document.getElementById('actualBar').style.width = '8%';
+  document.getElementById('hypothBar').style.width = '100%';
+}, 200);
+
+// Tab switching
+const tabData = {
+  today: { label: '今日消耗', cost: '¥3.20', calls: '68 次调用', savings: '¥48.30' },
+  week: { label: '本周消耗', cost: '¥18.60', calls: '420 次调用', savings: '¥48.30' },
+  month: { label: '本月消耗', cost: '¥24.50', calls: '1,836 次调用', savings: '¥48.30' }
+};
+document.querySelectorAll('.tab-item').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const d = tabData[tab.dataset.tab];
+    document.getElementById('periodLabel').textContent = d.label;
+    document.getElementById('periodCost').textContent = d.cost;
+    document.getElementById('periodCalls').textContent = d.calls;
+  });
+});
+
+function toggleExpand() {
+  const sec = document.getElementById('expandSection');
+  const btn = document.getElementById('expandBtn');
+  if (sec.classList.contains('show')) {
+    sec.classList.remove('show'); btn.textContent = '查看完整报告 ↓';
+  } else {
+    sec.classList.add('show'); btn.textContent = '收起 ↑';
+  }
+}
+</script>
+
+<a href="index.html" class="back-to-index" title="返回导航页">
+  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+  导航页
+</a>
+
+</body>
+</html>

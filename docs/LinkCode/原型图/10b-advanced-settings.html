@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode — 高级 / 模型设置</title>
+<style>
+:root {
+  --bg-app: #0f0f0f;
+  --bg-surface: #141414;
+  --bg-elevated: #1c1c1c;
+  --bg-hover: #232323;
+  --bg-active: #2a2a2a;
+  --bg-border: #2e2e2e;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-subtle: rgba(124,58,237,0.12);
+  --accent-text: #a78bfa;
+  --text-primary: #e2e2e2;
+  --text-secondary: #888888;
+  --text-tertiary: #555555;
+  --green: #22c55e;
+  --red: #ef4444;
+  --yellow: #f59e0b;
+  --blue: #3b82f6;
+  --font-ui: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-code: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  font-family: var(--font-ui); font-size: 13px; line-height: 1.5;
+  color: var(--text-primary); background: var(--bg-app); width: 100%; height: 100%; overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+.vscode-frame { width: 100%; height: 100vh; display: flex; flex-direction: column; background: var(--bg-app); overflow: hidden; }
+.vscode-titlebar {
+  height: 36px; background: var(--bg-surface); display: flex; align-items: center;
+  padding: 0 12px; gap: 8px; flex-shrink: 0; border-bottom: 1px solid var(--bg-border);
+}
+.titlebar-dot { width: 12px; height: 12px; border-radius: 50%; }
+.titlebar-dot.close { background: #ff5f57; }
+.titlebar-dot.minimize { background: #ffbd2e; }
+.titlebar-dot.maximize { background: #28c840; }
+.titlebar-title { flex: 1; text-align: center; font-size: 12px; color: var(--text-tertiary); }
+
+.vscode-body { flex: 1; display: flex; overflow: hidden; }
+
+.vscode-sidebar {
+  width: 48px; background: var(--bg-surface); border-right: 1px solid var(--bg-border);
+  display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 4px; flex-shrink: 0;
+}
+.sidebar-icon {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  color: var(--text-tertiary); cursor: pointer; border-radius: var(--radius-sm);
+  transition: all var(--duration-fast) var(--ease);
+}
+.sidebar-icon:hover { color: var(--text-primary); background: var(--bg-hover); }
+.sidebar-icon.active { color: var(--accent-text); }
+
+.settings-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.settings-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--bg-border); background: var(--bg-surface);
+  flex-shrink: 0; padding: 0 16px;
+}
+.settings-tab {
+  padding: 10px 20px; font-size: 12px; font-weight: 500; color: var(--text-secondary);
+  cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all var(--duration-fast) var(--ease); text-decoration: none;
+}
+.settings-tab:hover { color: var(--text-primary); }
+.settings-tab.active { color: var(--accent-text); border-bottom-color: var(--accent); }
+
+.settings-scroll { flex: 1; overflow-y: auto; padding: 24px 32px 64px; max-width: 680px; }
+
+.section { margin-bottom: 32px; }
+.section-title {
+  font-size: 11px; font-weight: 600; color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--bg-border);
+}
+
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0; border-bottom: 1px solid rgba(46,46,46,0.5);
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-info { flex: 1; margin-right: 16px; }
+.setting-label { font-size: 13px; color: var(--text-primary); font-weight: 500; margin-bottom: 2px; }
+.setting-desc { font-size: 11px; color: var(--text-tertiary); }
+
+.toggle {
+  width: 36px; height: 20px; border-radius: 10px; background: #333; cursor: pointer;
+  position: relative; transition: background var(--duration-fast) var(--ease);
+  border: none; padding: 0; flex-shrink: 0;
+}
+.toggle::after {
+  content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%;
+  background: #888; top: 2px; left: 2px; transition: all var(--duration-fast) var(--ease);
+}
+.toggle.active { background: var(--accent); }
+.toggle.active::after { left: 18px; background: #fff; }
+
+.input {
+  width: 100%; padding: 8px 12px; background: var(--bg-elevated); border: 1px solid var(--bg-border);
+  border-radius: var(--radius-md); color: var(--text-primary); font-size: 13px;
+  font-family: var(--font-ui); outline: none; transition: border-color var(--duration-fast);
+}
+.input:focus { border-color: var(--accent); }
+.input::placeholder { color: var(--text-tertiary); }
+.input-mono { font-family: var(--font-code); font-size: 12px; }
+
+.select {
+  padding: 6px 10px; background: var(--bg-elevated); border: 1px solid var(--bg-border);
+  border-radius: var(--radius-md); color: var(--text-primary); font-size: 12px;
+  font-family: var(--font-ui); outline: none; cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center; padding-right: 28px;
+}
+.select:focus { border-color: var(--accent); }
+
+/* Slider */
+.slider-row { display: flex; align-items: center; gap: 12px; }
+.slider {
+  flex: 1; -webkit-appearance: none; appearance: none; height: 4px;
+  background: var(--bg-active); border-radius: 2px; outline: none;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 14px; height: 14px;
+  border-radius: 50%; background: var(--accent); cursor: pointer;
+  border: 2px solid var(--bg-app);
+}
+.slider-value {
+  min-width: 48px; text-align: right; font-family: var(--font-code);
+  font-size: 12px; color: var(--accent-text);
+}
+
+/* Textarea */
+.textarea {
+  width: 100%; min-height: 80px; padding: 10px 12px;
+  background: var(--bg-elevated); border: 1px solid var(--bg-border);
+  border-radius: var(--radius-md); color: var(--text-primary);
+  font-family: var(--font-code); font-size: 12px; line-height: 1.6;
+  outline: none; resize: vertical;
+}
+.textarea:focus { border-color: var(--accent); }
+.textarea::placeholder { color: var(--text-tertiary); }
+
+.badge {
+  display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 3px;
+  font-size: 10px; font-weight: 500;
+}
+.badge-purple { background: var(--accent-subtle); color: var(--accent-text); }
+
+/* Status Bar */
+.vscode-statusbar {
+  height: 24px; background: var(--bg-surface); border-top: 1px solid var(--bg-border);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 10px;
+  font-size: 11px; flex-shrink: 0;
+}
+.statusbar-left, .statusbar-right { display: flex; align-items: center; gap: 12px; }
+.statusbar-item { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); }
+
+.back-to-index {
+  position: fixed; top: 42px; right: 12px; z-index: 9999;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; background: rgba(28,28,28,0.9);
+  border: 1px solid #2e2e2e; border-radius: 6px;
+  color: #a78bfa; font-size: 11px; font-weight: 500;
+  cursor: pointer; backdrop-filter: blur(8px);
+  transition: all 0.15s var(--ease); text-decoration: none;
+  font-family: var(--font-ui); opacity: 0.7;
+}
+.back-to-index:hover { opacity: 1; background: rgba(44,44,44,0.95); border-color: #7c3aed; text-decoration: none; }
+</style>
+</head>
+<body>
+<a href="index.html" class="back-to-index">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+  导航页
+</a>
+
+<div class="vscode-frame">
+  <div class="vscode-titlebar">
+    <div class="titlebar-dot close"></div><div class="titlebar-dot minimize"></div><div class="titlebar-dot maximize"></div>
+    <div class="titlebar-title">LinkCode — 高级设置</div>
+    <div style="width:36px"></div>
+  </div>
+
+  <div class="vscode-body">
+    <div class="vscode-sidebar">
+      <div class="sidebar-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg></div>
+      <div class="sidebar-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+      <div class="sidebar-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+      <div style="flex:1"></div>
+      <div class="sidebar-icon active"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></div>
+    </div>
+
+    <div class="settings-main">
+      <div class="settings-tabs">
+        <a class="settings-tab" href="10-settings.html">基础设置</a>
+        <a class="settings-tab active" href="10b-advanced-settings.html">高级 / 模型</a>
+      </div>
+
+      <div class="settings-scroll">
+        <!-- Temperature -->
+        <div class="section">
+          <div class="section-title">🎛️ 模型参数</div>
+          <div class="setting-row" style="flex-direction:column; align-items:stretch;">
+            <div class="setting-info" style="margin-bottom:8px;">
+              <div class="setting-label">Temperature</div>
+              <div class="setting-desc">控制回复的创造性 · 0 = 精确，1 = 创造性，2 = 随机</div>
+            </div>
+            <div class="slider-row">
+              <input type="range" class="slider" min="0" max="200" value="70" id="tempSlider" oninput="document.getElementById('tempVal').textContent = (this.value/100).toFixed(2)">
+              <span class="slider-value" id="tempVal">0.70</span>
+            </div>
+          </div>
+
+          <div class="setting-row" style="flex-direction:column; align-items:stretch;">
+            <div class="setting-info" style="margin-bottom:8px;">
+              <div class="setting-label">Max Tokens</div>
+              <div class="setting-desc">单次回复最大 Token 数 · 影响回复长度和成本</div>
+            </div>
+            <div class="slider-row">
+              <input type="range" class="slider" min="256" max="16384" value="4096" step="256" id="maxTokensSlider" oninput="document.getElementById('maxTokensVal').textContent = this.value">
+              <span class="slider-value" id="maxTokensVal">4096</span>
+            </div>
+          </div>
+
+          <div class="setting-row" style="flex-direction:column; align-items:stretch;">
+            <div class="setting-info" style="margin-bottom:8px;">
+              <div class="setting-label">Top P (Nucleus Sampling)</div>
+              <div class="setting-desc">控制候选 Token 的范围 · 0.1 = 保守，1.0 = 全部考虑</div>
+            </div>
+            <div class="slider-row">
+              <input type="range" class="slider" min="10" max="100" value="95" id="topPSlider" oninput="document.getElementById('topPVal').textContent = (this.value/100).toFixed(2)">
+              <span class="slider-value" id="topPVal">0.95</span>
+            </div>
+          </div>
+
+          <div class="setting-row" style="flex-direction:column; align-items:stretch;">
+            <div class="setting-info" style="margin-bottom:8px;">
+              <div class="setting-label">Top K</div>
+              <div class="setting-desc">限制候选 Token 数量 · 0 = 不限制</div>
+            </div>
+            <div class="slider-row">
+              <input type="range" class="slider" min="0" max="100" value="40" id="topKSlider" oninput="document.getElementById('topKVal').textContent = this.value">
+              <span class="slider-value" id="topKVal">40</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- GPU / Inference -->
+        <div class="section">
+          <div class="section-title">🖥️ 本地推理（GPU）</div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">GPU 加速层数</div>
+              <div class="setting-desc">卸载到 GPU 的 Transformer 层数 · 0 = 纯 CPU，-1 = 全部 GPU</div>
+            </div>
+            <div class="slider-row" style="min-width:180px;">
+              <input type="range" class="slider" min="-1" max="64" value="32" id="gpuSlider" oninput="document.getElementById('gpuVal').textContent = this.value == -1 ? 'ALL' : this.value">
+              <span class="slider-value" id="gpuVal">32</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">本地模型路径</div>
+              <div class="setting-desc">GGUF / ONNX 模型文件路径</div>
+            </div>
+            <input class="input input-mono" style="max-width:260px;" value="~/.linkcode/models/" />
+          </div>
+        </div>
+
+        <!-- Thinking Mode -->
+        <div class="section">
+          <div class="section-title">🧠 思考模式</div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">启用思考模式</div>
+              <div class="setting-desc">让 AI 先"思考"再回答 · 适合复杂推理题，增加响应时间和成本</div>
+            </div>
+            <button class="toggle active" onclick="this.classList.toggle('active')"></button>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">思考内容可见性</div>
+              <div class="setting-desc">是否在 Chat 中展示 AI 的思考过程</div>
+            </div>
+            <select class="select">
+              <option selected>折叠显示</option>
+              <option>始终展开</option>
+              <option>隐藏</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">思考预算 (Max Tokens)</div>
+              <div class="setting-desc">思考阶段允许消耗的最大 Token 数</div>
+            </div>
+            <div class="slider-row" style="min-width:180px;">
+              <input type="range" class="slider" min="512" max="8192" value="2048" step="256" id="thinkSlider" oninput="document.getElementById('thinkVal').textContent = this.value">
+              <span class="slider-value" id="thinkVal">2048</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Context Window -->
+        <div class="section">
+          <div class="section-title">📐 Context Window</div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">最大上下文长度</div>
+              <div class="setting-desc">单次会话允许的最大上下文 Token 数 · 超出后自动截断早期消息</div>
+            </div>
+            <select class="select">
+              <option>8K</option>
+              <option>16K</option>
+              <option selected>32K</option>
+              <option>64K</option>
+              <option>128K</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">上下文策略</div>
+              <div class="setting-desc">超出长度时如何处理</div>
+            </div>
+            <select class="select">
+              <option selected>滑动窗口（丢弃最早消息）</option>
+              <option>摘要压缩（AI 自动总结）</option>
+              <option>严格截断</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- System Prompt -->
+        <div class="section">
+          <div class="section-title">📝 系统提示词</div>
+          <div class="setting-row" style="flex-direction:column; align-items:stretch;">
+            <div class="setting-info" style="margin-bottom:8px;">
+              <div class="setting-label">全局 System Prompt</div>
+              <div class="setting-desc">在每次对话开头注入的系统指令 · 影响 AI 行为风格</div>
+            </div>
+            <textarea class="textarea" placeholder="例如：你是一个资深 TypeScript 开发者，回复要简洁、实用，优先给代码...">你是 LinkCode AI 编程助手。请用中文回复，代码注释也用中文。优先考虑代码质量、类型安全和最佳实践。回复要简洁实用。</textarea>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">项目级 System Prompt</div>
+              <div class="setting-desc">从 .linkcode/prompt.md 自动加载项目级提示词</div>
+            </div>
+            <button class="toggle active" onclick="this.classList.toggle('active')"></button>
+          </div>
+        </div>
+
+        <!-- Smart Routing -->
+        <div class="section">
+          <div class="section-title">🔀 智能路由</div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">启用智能路由</div>
+              <div class="setting-desc">根据问题复杂度自动选择最优模型 · 简单问题用便宜模型</div>
+            </div>
+            <button class="toggle active" onclick="this.classList.toggle('active')"></button>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">成本偏好</div>
+              <div class="setting-desc">平衡质量与成本的倾向</div>
+            </div>
+            <select class="select">
+              <option>省钱优先</option>
+              <option selected>平衡</option>
+              <option>质量优先</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="vscode-statusbar">
+    <div class="statusbar-left">
+      <div class="statusbar-item" style="color:var(--accent-text);">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        LinkCode v2.4.1
+      </div>
+    </div>
+    <div class="statusbar-right">
+      <div class="statusbar-item" style="color:var(--green);">⚡ Pro</div>
+      <div class="statusbar-item">高级设置</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

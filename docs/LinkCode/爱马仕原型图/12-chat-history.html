@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode - 对话历史管理</title>
+<link rel="stylesheet" href="shared-styles.css">
+<style>
+body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.history-layout { flex: 1; display: flex; overflow: hidden; }
+
+/* Left: Session List */
+.session-list {
+  width: 300px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+}
+.session-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.session-header-top { display: flex; align-items: center; justify-content: space-between; }
+.session-header h3 { font-size: 14px; font-weight: 600; color: var(--text-bright); }
+.new-chat-btn {
+  padding: 4px 10px; border-radius: var(--radius-md);
+  background: var(--accent-gradient); color: white;
+  border: none; font-size: 12px; cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+  transition: all 0.15s;
+}
+.new-chat-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.new-chat-btn:active { transform: translateY(0); }
+.search-box {
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 6px 10px;
+  display: flex; align-items: center; gap: 6px;
+}
+.search-box input {
+  background: transparent; border: none; color: var(--text-primary);
+  font-size: 12px; outline: none; flex: 1;
+  font-family: 'Inter', sans-serif;
+}
+.search-box input::placeholder { color: var(--text-muted); }
+.search-icon { color: var(--text-muted); font-size: 13px; }
+
+.sessions-scroll { flex: 1; overflow-y: auto; padding: 8px 0; }
+.session-group-label {
+  padding: 6px 14px;
+  font-size: 11px; font-weight: 600;
+  color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.session-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-left: 2px solid transparent;
+  position: relative;
+}
+.session-item:hover { background: var(--bg-hover); }
+.session-item.active {
+  background: var(--bg-selected);
+  border-left-color: var(--accent);
+}
+.session-item.pinned::before {
+  content: '📌'; position: absolute; top: 10px; right: 10px; font-size: 10px;
+}
+.session-title {
+  font-size: 13px; color: var(--text-primary);
+  margin-bottom: 3px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+  padding-right: 20px;
+}
+.session-meta {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--text-muted);
+}
+.session-model {
+  padding: 1px 5px; border-radius: 3px;
+  background: rgba(124,58,237,0.12); color: var(--accent-light);
+  font-size: 10px;
+}
+.session-actions {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  display: none; gap: 2px;
+}
+.session-item:hover .session-actions { display: flex; }
+.session-action-btn {
+  width: 22px; height: 22px; border-radius: 4px;
+  background: transparent; border: none; color: var(--text-muted);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; transition: all 0.1s;
+}
+.session-action-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+
+/* Right: Chat Preview */
+.chat-preview {
+  flex: 1; display: flex; flex-direction: column;
+  background: var(--bg-primary);
+}
+.preview-header {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.preview-header h3 { font-size: 14px; font-weight: 600; color: var(--text-bright); }
+.preview-meta { font-size: 11px; color: var(--text-muted); }
+.preview-messages {
+  flex: 1; overflow-y: auto; padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+/* Left-aligned stream layout (Cursor style) */
+.preview-msg { animation: fadeIn 0.3s ease; }
+.preview-msg-user {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.preview-msg-user-label {
+  font-size: 11px; font-weight: 600; color: var(--text-secondary);
+  margin-bottom: 4px; display: flex; align-items: center; gap: 6px;
+}
+.preview-msg-user-text { font-size: 13px; color: var(--text-primary); line-height: 1.6; }
+.preview-msg-ai {
+  padding: 8px 0;
+  border-left: 2px solid var(--accent);
+  padding-left: 14px;
+}
+.preview-msg-ai-header {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-muted); margin-bottom: 6px;
+}
+.preview-msg-ai-avatar {
+  width: 18px; height: 18px; border-radius: 4px;
+  background: var(--accent-gradient);
+  display: flex; align-items: center; justify-content: center;
+}
+.preview-msg-ai-avatar svg { width: 10px; height: 10px; }
+.preview-msg-ai-text { font-size: 13px; color: var(--text-primary); line-height: 1.6; }
+.preview-msg-ai-text code {
+  background: var(--bg-tertiary); padding: 1px 5px;
+  border-radius: 3px; font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: var(--accent-light);
+}
+
+.preview-input {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+}
+.preview-input-box {
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 10px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px; color: var(--text-muted);
+}
+.preview-send {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: var(--accent-gradient); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.15s;
+}
+.preview-send:hover { opacity: 0.85; }
+
+/* Empty list state */
+.empty-list {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 24px; text-align: center;
+}
+.empty-list-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.5; }
+.empty-list-title { font-size: 14px; color: var(--text-secondary); margin-bottom: 6px; }
+.empty-list-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<div class="macos-window">
+  <div class="titlebar">
+    <div class="traffic-lights"><span class="tl-close"></span><span class="tl-minimize"></span><span class="tl-maximize"></span></div>
+    <div class="titlebar-text">对话历史 — LinkCode</div>
+  </div>
+  <div class="vscode-layout">
+    <div class="activity-bar">
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7v10l4-3V10L3 7zm0 0l9-4 9 4M12 3v18m0 0l9-4V7"/></svg></div>
+      <div class="activity-icon active" title="LinkCode AI">
+        <svg viewBox="0 0 24 24" fill="none"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#5ea2ef"/></linearGradient></defs><path d="M12 2L2 7l10 5 10-5-10-5z" fill="url(#lg)" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="url(#lg)" stroke-width="1.5" fill="none"/></svg>
+      </div>
+      <div class="activity-spacer"></div>
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4m-8.66-2.34l2.83-2.83m11.66-5.66l2.83-2.83M1 12h4m14 0h4"/></svg></div>
+    </div>
+
+    <div class="history-layout">
+      <!-- Session List -->
+      <div class="session-list">
+        <div class="session-header">
+          <div class="session-header-top">
+            <h3>💬 对话历史</h3>
+            <button class="new-chat-btn" onclick="this.textContent='✨ 已创建'">+ 新对话</button>
+          </div>
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" placeholder="搜索对话..." id="searchInput" oninput="filterSessions(this.value)">
+          </div>
+        </div>
+        <div class="sessions-scroll">
+          <div class="session-group-label">今天</div>
+          <div class="session-item active pinned" data-title="UserProfile 组件错误处理">
+            <div class="session-title">UserProfile 组件错误处理</div>
+            <div class="session-meta">
+              <span class="session-model">DeepSeek-V3</span>
+              <span>12 条消息 · 10:30</span>
+            </div>
+            <div class="session-actions">
+              <button class="session-action-btn" title="重命名" onclick="event.stopPropagation()">✏️</button>
+              <button class="session-action-btn" title="删除" onclick="event.stopPropagation();this.closest('.session-item').style.display='none'">🗑️</button>
+            </div>
+          </div>
+          <div class="session-item" data-title="优化 API 请求性能">
+            <div class="session-title">优化 API 请求性能</div>
+            <div class="session-meta">
+              <span class="session-model">Claude Sonnet</span>
+              <span>8 条消息 · 09:15</span>
+            </div>
+            <div class="session-actions">
+              <button class="session-action-btn" title="置顶" onclick="event.stopPropagation()">📌</button>
+              <button class="session-action-btn" title="删除" onclick="event.stopPropagation();this.closest('.session-item').style.display='none'">🗑️</button>
+            </div>
+          </div>
+          <div class="session-item" data-title="React Hook 最佳实践">
+            <div class="session-title">React Hook 最佳实践</div>
+            <div class="session-meta">
+              <span class="session-model">GPT-4o</span>
+              <span>15 条消息 · 08:42</span>
+            </div>
+            <div class="session-actions">
+              <button class="session-action-btn" title="置顶" onclick="event.stopPropagation()">📌</button>
+              <button class="session-action-btn" title="删除" onclick="event.stopPropagation();this.closest('.session-item').style.display='none'">🗑️</button>
+            </div>
+          </div>
+
+          <div class="session-group-label">昨天</div>
+          <div class="session-item" data-title="TypeScript 泛型约束">
+            <div class="session-title">TypeScript 泛型约束</div>
+            <div class="session-meta">
+              <span class="session-model">DeepSeek-V3</span>
+              <span>6 条消息 · 昨天 16:20</span>
+            </div>
+            <div class="session-actions">
+              <button class="session-action-btn" title="置顶" onclick="event.stopPropagation()">📌</button>
+              <button class="session-action-btn" title="删除" onclick="event.stopPropagation();this.closest('.session-item').style.display='none'">🗑️</button>
+            </div>
+          </div>
+          <div class="session-item" data-title="CSS Grid 响应式布局">
+            <div class="session-title">CSS Grid 响应式布局</div>
+            <div class="session-meta">
+              <span class="session-model">Qwen-72B</span>
+              <span>4 条消息 · 昨天 14:05</span>
+            </div>
+            <div class="session-actions">
+              <button class="session-action-btn" title="置顶" onclick="event.stopPropagation()">📌</button>
+              <button class="session-action-btn" title="删除" onclick="event.stopPropagation();this.closest('.session-item').style.display='none'">🗑️</button>
+            </div>
+          </div>
+
+          <div class="session-group-label">更早</div>
+          <div class="session-item" data-title="Node.js 流处理">
+            <div class="session-title">Node.js 流处理</div>
+            <div class="session-meta">
+              <span class="session-model">Claude Sonnet</span>
+              <span>20 条消息 · 4月19日</span>
+            </div>
+            <div class="session-actions">
+              <button class="session-action-btn" title="置顶" onclick="event.stopPropagation()">📌</button>
+              <button class="session-action-btn" title="删除" onclick="event.stopPropagation();this.closest('.session-item').style.display='none'">🗑️</button>
+            </div>
+          </div>
+          <div class="session-item" data-title="Docker 容器化部署">
+            <div class="session-title">Docker 容器化部署</div>
+            <div class="session-meta">
+              <span class="session-model">GPT-4o</span>
+              <span>10 条消息 · 4月18日</span>
+            </div>
+            <div class="session-actions">
+              <button class="session-action-btn" title="置顶" onclick="event.stopPropagation()">📌</button>
+              <button class="session-action-btn" title="删除" onclick="event.stopPropagation();this.closest('.session-item').style.display='none'">🗑️</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat Preview -->
+      <div class="chat-preview">
+        <div class="preview-header">
+          <h3>UserProfile 组件错误处理</h3>
+          <span class="preview-meta">DeepSeek-V3 · 12 条消息 · 今天 10:30</span>
+        </div>
+        <div class="preview-messages">
+          <div class="preview-msg preview-msg-user">
+            <div class="preview-msg-user-label">👤 你</div>
+            <div class="preview-msg-user-text">帮我给 UserProfile 组件添加错误处理和加载状态的骨架屏效果</div>
+          </div>
+          <div class="preview-msg preview-msg-ai">
+            <div class="preview-msg-ai-header">
+              <div class="preview-msg-ai-avatar"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.5" fill="none"/></svg></div>
+              DeepSeek-V3 · 1.2s · 386 tokens · ¥0.002
+            </div>
+            <div class="preview-msg-ai-text">
+              <p>好的！我来为 <code>UserProfile</code> 添加错误处理和骨架屏效果。主要改动：</p>
+              <p>1. 添加 <code>error</code> 状态管理<br>2. 新增 <code>SkeletonLoader</code> 组件<br>3. 使用 <code>try/catch</code> 包裹 API 调用</p>
+            </div>
+          </div>
+          <div class="preview-msg preview-msg-user">
+            <div class="preview-msg-user-label">👤 你</div>
+            <div class="preview-msg-user-text">好的，帮我实现骨架屏组件，参考 @workspace 的设计规范</div>
+          </div>
+          <div class="preview-msg preview-msg-ai">
+            <div class="preview-msg-ai-header">
+              <div class="preview-msg-ai-avatar"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.5" fill="none"/></svg></div>
+              DeepSeek-V3 · 2.1s · 724 tokens · ¥0.005
+            </div>
+            <div class="preview-msg-ai-text">
+              <p>我根据你的设计规范实现了 <code>SkeletonLoader</code> 组件，使用了 CSS <code>@keyframes shimmer</code> 动画...</p>
+            </div>
+          </div>
+        </div>
+        <div class="preview-input">
+          <div class="preview-input-box">
+            <span>继续对话... (⌘Enter 发送)</span>
+            <button class="preview-send"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="white" stroke-width="2" stroke-linecap="round"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div class="status-accent">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.5" fill="none"/></svg>
+      LinkCode
+    </div>
+    <div class="status-bar-left">
+      <div class="status-item"><span style="width:6px;height:6px;border-radius:50%;background:#4ec9b0;display:inline-block;"></span> DeepSeek-V3</div>
+      <div class="status-item">⚡ 自动路由</div>
+      <div class="status-item" style="color:#4ec9b0">🪙 ¥12.50</div>
+    </div>
+    <div class="status-bar-right"><div class="status-item">7 个对话 · 75 条消息</div></div>
+  </div>
+</div>
+
+<script>
+// Session click
+document.querySelectorAll('.session-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.session-item').forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+  });
+});
+
+// Search filter
+function filterSessions(query) {
+  const q = query.toLowerCase();
+  document.querySelectorAll('.session-item').forEach(item => {
+    const title = item.getAttribute('data-title').toLowerCase();
+    item.style.display = title.includes(q) ? '' : 'none';
+  });
+}
+</script>
+</body>
+</html>

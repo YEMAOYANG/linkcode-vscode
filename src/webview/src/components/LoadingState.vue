@@ -41,7 +41,7 @@ defineProps<{
   align-items: center;
   justify-content: center;
   padding: 12px 16px;
-  animation: fadeIn 0.2s ease;
+  animation: lc-fade-in 0.2s ease;
 }
 
 .loading-indicator {
@@ -58,7 +58,7 @@ defineProps<{
 
 .loading-text {
   font-size: 12px;
-  color: var(--lc-text-tertiary);
+  color: var(--lcc-text-subtle);
 }
 
 /* Enhanced thinking dots with text */
@@ -72,8 +72,8 @@ defineProps<{
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--lc-accent-text);
-  animation: bounce 1.2s ease-in-out infinite;
+  background: var(--lcc-accent);
+  animation: lc-float 1.2s ease-in-out infinite;
 }
 
 .thinking-dots-enhanced span:nth-child(2) { animation-delay: 0.15s; }
@@ -83,23 +83,9 @@ defineProps<{
 .loading-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid var(--lc-border);
-  border-top-color: var(--lc-accent);
+  border: 2px solid var(--lcc-border);
+  border-top-color: var(--lcc-accent);
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  animation: lc-spin 0.8s linear infinite;
 }
 </style>

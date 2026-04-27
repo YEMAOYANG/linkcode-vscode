@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LinkCode 原型图 v2 — 完整交互流程</title>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0a; color: #e2e2e2;
+      font-family: -apple-system, 'Segoe UI', sans-serif;
+      font-size: 13px; padding: 32px 24px 64px; max-width: 1600px; margin: 0 auto;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .header { margin-bottom: 40px; display: flex; align-items: flex-start; justify-content: space-between; }
+    .header-left h1 { font-size: 20px; font-weight: 600; color: #e2e2e2; margin-bottom: 6px; }
+    .header-left h1 span { color: #7c3aed; }
+    .header-left p { color: #555; font-size: 12px; line-height: 1.6; }
+    .header-badge {
+      display: flex; gap: 8px; margin-top: 12px;
+    }
+    .badge {
+      font-size: 11px; padding: 3px 8px; border-radius: 4px;
+      border: 1px solid #2e2e2e; color: #888;
+    }
+    .badge.purple { border-color: #7c3aed44; color: #a78bfa; background: #7c3aed0d; }
+
+    /* Sections */
+    .section { margin-bottom: 48px; }
+    .section-header {
+      font-size: 11px; font-weight: 500; color: #555;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      margin-bottom: 16px; padding-bottom: 10px;
+      border-bottom: 1px solid #1a1a1a;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-header .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #7c3aed; flex-shrink: 0;
+    }
+
+    /* Grid */
+    .grid { display: flex; flex-wrap: wrap; gap: 20px; }
+
+    /* Card */
+    .card {
+      background: #111; border: 1px solid #1e1e1e;
+      border-radius: 8px; overflow: hidden;
+      transition: border-color 150ms, transform 150ms;
+      width: 320px;
+    }
+    .card:hover { border-color: #7c3aed55; transform: translateY(-2px); }
+    .card.featured { border-color: #7c3aed44; }
+
+    .card-header {
+      padding: 9px 12px; border-bottom: 1px solid #181818;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card-num {
+      min-width: 20px; height: 20px; background: #7c3aed15;
+      border-radius: 4px; display: flex; align-items: center; justify-content: center;
+      font-size: 10px; color: #7c3aed; font-weight: 700; flex-shrink: 0;
+    }
+    .card-title { font-size: 12px; color: #ccc; flex: 1; font-weight: 500; }
+    .card-tag {
+      font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 500;
+    }
+    .card-tag.p0 { background: #7c3aed15; color: #a78bfa; border: 1px solid #7c3aed30; }
+    .card-tag.p1 { background: #22c55e12; color: #4ade80; border: 1px solid #22c55e25; }
+    .card-tag.star { background: #f59e0b15; color: #fbbf24; border: 1px solid #f59e0b30; }
+
+    .iframe-container {
+      width: 320px; height: 460px;
+      overflow: hidden; position: relative;
+      background: #0d0d0d;
+    }
+    .iframe-container iframe {
+      width: 640px; height: 960px;
+      transform: scale(0.5); transform-origin: top left;
+      border: none; pointer-events: none;
+    }
+
+    .card-footer {
+      padding: 8px 12px; border-top: 1px solid #181818;
+    }
+    .btn-view {
+      display: block; width: 100%; padding: 6px 0;
+      font-size: 11px; color: #7c3aed;
+      background: #7c3aed0d; border: 1px solid #7c3aed22;
+      border-radius: 5px; text-align: center; text-decoration: none;
+      transition: background 120ms, border-color 120ms;
+      cursor: pointer;
+    }
+    .btn-view:hover { background: #7c3aed20; border-color: #7c3aed44; }
+
+    /* Flow arrow */
+    .flow-hint {
+      font-size: 11px; color: #444; margin-top: 10px;
+      padding: 8px 12px; background: #0f0f0f;
+      border: 1px solid #1a1a1a; border-radius: 6px;
+      line-height: 1.8;
+    }
+    .flow-hint span { color: #a78bfa; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-left">
+      <h1>⚡ <span>LinkCode</span> 原型图 v2</h1>
+      <p>VS Code AI 多模型编程助手 · Linear 设计系统 · 25 个页面 · 完整交互流程</p>
+      <div class="header-badge">
+        <span class="badge purple">Linear Design System</span>
+        <span class="badge">品牌紫 #7c3aed</span>
+        <span class="badge">暗色主题</span>
+        <span class="badge">25 页面全交互</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 用户流程说明 -->
+  <div class="flow-hint" style="margin-bottom:40px;">
+    📌 <strong style="color:#e2e2e2">完整用户流程：</strong>
+    <span>03 安装引导</span> → <span>04 设置Key</span> → <span>05 体验补全</span> → <span>06 快捷键</span> →
+    <span>01 Chat空状态</span> → <span>02 Chat对话</span> →（其他功能页面）
+    <br>💡 点击每个卡片底部「查看全屏 →」打开可交互原型
+  </div>
+
+  <!-- ⭐ 0. Ghost Text — 核心场景 -->
+  <div class="section">
+    <div class="section-header"><div class="dot"></div>⭐ 核心场景 — Ghost Text 编辑器内补全</div>
+    <div class="grid">
+      <div class="card featured">
+        <div class="card-header">
+          <div class="card-num">00</div>
+          <div class="card-title">Ghost Text 编辑器内补全（核心功能）</div>
+          <div class="card-tag star">⭐ 核心场景</div>
+        </div>
+        <div class="iframe-container"><iframe src="00-ghost-text.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="00-ghost-text.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. Chat 核心流程 -->
+  <div class="section">
+    <div class="section-header"><div class="dot"></div>💬 Chat 核心流程</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">01</div>
+          <div class="card-title">Chat 空状态</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="01-chat-empty.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="01-chat-empty.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">02</div>
+          <div class="card-title">Chat 对话中（含代码块 + 流式动画）</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="02-chat-active.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="02-chat-active.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 安装引导流程 -->
+  <div class="section">
+    <div class="section-header"><div class="dot"></div>🚀 安装引导流程（Step 1 → 2 → 3 → 4 → 主界面）</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">03</div>
+          <div class="card-title">引导 Step 1：欢迎页</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="03-onboarding-step1.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="03-onboarding-step1.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">04</div>
+          <div class="card-title">引导 Step 2：设置 API Key</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="04-onboarding-step2.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="04-onboarding-step2.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">05</div>
+          <div class="card-title">引导 Step 3：体验补全</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="05-onboarding-step3.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="05-onboarding-step3.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">06</div>
+          <div class="card-title">引导 Step 4：快捷键备忘卡</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="06-onboarding-step4.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="06-onboarding-step4.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 模型与设置 -->
+  <div class="section">
+    <div class="section-header"><div class="dot"></div>🤖 模型与设置</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">07</div>
+          <div class="card-title">模型选择器（61+ 模型 + 智能路由）</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="07-model-selector.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="07-model-selector.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">10</div>
+          <div class="card-title">基础设置（账号/API Key/语言/快捷键）</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="10-settings.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="10-settings.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">10b</div>
+          <div class="card-title">高级设置（模型参数/GPU/思考模式）</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="10b-advanced-settings.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="10b-advanced-settings.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. 编辑功能 -->
+  <div class="section">
+    <div class="section-header"><div class="dot"></div>✏️ 编辑功能</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">08</div>
+          <div class="card-title">Ctrl+K Inline Edit（Diff 预览 + Accept/Reject）</div>
+          <div class="card-tag p1">P1</div>
+        </div>
+        <div class="iframe-container"><iframe src="08-inline-edit.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="08-inline-edit.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. 成本与账户 -->
+  <div class="section">
+    <div class="section-header"><div class="dot"></div>💰 成本透明与账户</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">09</div>
+          <div class="card-title">成本透明仪表板（路由节省可视化）</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="09-cost-dashboard.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="09-cost-dashboard.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">12</div>
+          <div class="card-title">Token 余额预警（不足提示 + 充值）</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="12-token-warning.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="12-token-warning.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">16</div>
+          <div class="card-title">升级提示（Free → Pro 对比）</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="16-upgrade-prompt.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="16-upgrade-prompt.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. 上下文引用 -->
+  <div class="section">
+    <div class="section-header"><div class="dot"></div>📂 上下文引用</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">11</div>
+          <div class="card-title">@引用下拉（文件 / 符号 / 键盘导航）</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="11-at-mention.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="11-at-mention.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. 历史与管理 -->
+  <div class="section">
+    <div class="section-header"><div class="dot"></div>📋 历史与会话管理</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">13</div>
+          <div class="card-title">多会话历史列表</div>
+          <div class="card-tag p1">P1</div>
+        </div>
+        <div class="iframe-container"><iframe src="13-session-history.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="13-session-history.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. 隐私与安全 -->
+  <div class="section">
+    <div class="section-header"><div class="dot"></div>🔒 隐私与安全</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">14</div>
+          <div class="card-title">Privacy Mode（数据不出境 · 国产模型）</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="14-privacy-mode.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="14-privacy-mode.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. 代码审查 -->
+  <div class="section">
+    <div class="section-header"><div class="dot"></div>🔍 代码审查</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">15</div>
+          <div class="card-title">AI 代码审查（Error / Warning / Suggestion）</div>
+          <div class="card-tag p1">P1</div>
+        </div>
+        <div class="iframe-container"><iframe src="15-code-review.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="15-code-review.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10. 登录/注册 -->
+  <div class="section">
+    <div class="section-header"><div class="dot"></div>🔑 登录 / 注册</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">18</div>
+          <div class="card-title">登录 / 注册页面（手机号 + 邮箱）</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="18-login.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="18-login.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 11. Chat 反馈 -->
+  <div class="section">
+    <div class="section-header"><div class="dot"></div>👍 Chat 反馈</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">19</div>
+          <div class="card-title">Chat 反馈状态（👍 已采纳 / 👎 反馈面板）</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="19-chat-feedback.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="19-chat-feedback.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 12. 错误状态 -->
+  <div class="section">
+    <div class="section-header"><div class="dot"></div>⚠️ 错误状态</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">20</div>
+          <div class="card-title">网络异常 / API Key 失效 / 模型调用失败</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="20-error-states.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="20-error-states.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 13. Loading 状态 -->
+  <div class="section">
+    <div class="section-header"><div class="dot"></div>⏳ Loading 状态</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">21</div>
+          <div class="card-title">Loading 状态规范（4 种加载场景）</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="21-loading-states.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="21-loading-states.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 14. 文件与多媒体交互 -->
+  <div class="section">
+    <div class="section-header"><div class="dot"></div>📎 文件与多媒体交互</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">22</div>
+          <div class="card-title">拖拽文件上传（5 种状态）</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="22-file-drag-drop.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="22-file-drag-drop.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">23</div>
+          <div class="card-title">图片拖拽 / 粘贴上传（4 种状态）</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="23-image-upload.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="23-image-upload.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-num">24</div>
+          <div class="card-title">引用代码块（3 种场景）</div>
+          <div class="card-tag p0">P0</div>
+        </div>
+        <div class="iframe-container"><iframe src="24-code-block-reference.html" loading="lazy"></iframe></div>
+        <div class="card-footer"><a href="24-code-block-reference.html" target="_blank" class="btn-view">查看全屏 →</a></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  </script>
+</body>
+</html>

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>LinkCode - Inline Edit (⌘K)</title>
+<link rel="stylesheet" href="shared-styles.css">
+<style>
+body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.inline-edit-overlay {
+  position: absolute;
+  top: 155px;
+  left: 55px;
+  right: 70px;
+  z-index: 20;
+}
+.inline-input-box {
+  background: #1a1a2e;
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 0 20px rgba(124, 92, 252, 0.15), 0 8px 30px rgba(0,0,0,0.4);
+  margin-bottom: 4px;
+}
+.inline-input-box svg { flex-shrink: 0; }
+.inline-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-bright);
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+}
+.inline-input::placeholder { color: var(--text-muted); }
+.inline-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.inline-actions .btn { padding: 4px 10px; font-size: 11px; }
+.diff-preview {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  line-height: 20px;
+  margin-top: 4px;
+}
+.diff-header {
+  padding: 6px 12px;
+  background: rgba(0,0,0,0.3);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.diff-line {
+  padding: 0 12px;
+  height: 20px;
+  white-space: pre;
+  display: flex;
+  align-items: center;
+}
+.diff-line-num {
+  width: 35px;
+  text-align: right;
+  padding-right: 10px;
+  color: var(--text-muted);
+  user-select: none;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.diff-add { background: rgba(78, 201, 176, 0.08); border-left: 3px solid var(--green); }
+.diff-add .diff-sign { color: var(--green); width: 16px; flex-shrink: 0; }
+.diff-remove { background: rgba(241, 76, 76, 0.08); border-left: 3px solid var(--red); }
+.diff-remove .diff-sign { color: var(--red); width: 16px; flex-shrink: 0; }
+.diff-context { border-left: 3px solid transparent; opacity: 0.6; }
+.diff-context .diff-sign { width: 16px; flex-shrink: 0; }
+.shortcut-hint {
+  position: absolute;
+  top: 130px;
+  right: 90px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  z-index: 5;
+}
+.shortcut-hint kbd { background: var(--bg-input); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-size: 10px; color: var(--text-secondary); }
+.file-tree-item { padding: 3px 8px 3px 24px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+.file-tree-item:hover { background: var(--bg-hover); }
+.file-tree-item.active { color: var(--text-bright); background: var(--bg-selected); }
+.folder-toggle { padding: 3px 8px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; color: var(--text-primary); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="macos-window">
+  <div class="titlebar">
+    <div class="traffic-lights"><span class="tl-close"></span><span class="tl-minimize"></span><span class="tl-maximize"></span></div>
+    <div class="titlebar-text">utils.ts — my-project — LinkCode</div>
+  </div>
+  <div class="vscode-layout">
+    <div class="activity-bar">
+      <div class="activity-icon active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7v10l4-3V10L3 7zm0 0l9-4 9 4M12 3v18m0 0l9-4V7"/></svg></div>
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg></div>
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="#7c3aed" opacity="0.5"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="#7c3aed" stroke-width="1.5" fill="none" opacity="0.5"/></svg></div>
+      <div class="activity-spacer"></div>
+      <div class="activity-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4"/></svg></div>
+    </div>
+    <div class="sidebar">
+      <div class="sidebar-header">资源管理器</div>
+      <div style="padding:6px 0;">
+        <div class="folder-toggle">▾ 📁 src</div>
+        <div class="file-tree-item" style="padding-left:32px;"><span style="color:#3178c6;">TS</span> app.tsx</div>
+        <div class="file-tree-item active" style="padding-left:32px;"><span style="color:#3178c6;">TS</span> utils.ts</div>
+        <div class="file-tree-item" style="padding-left:32px;"><span style="color:#3178c6;">TS</span> api.ts</div>
+      </div>
+    </div>
+    <div class="editor-area">
+      <div class="tab-bar">
+        <div class="tab active"><span class="tab-icon" style="color:#3178c6;">TS</span> utils.ts <span class="tab-close">×</span></div>
+      </div>
+      <div style="display:flex;flex:1;overflow:hidden;position:relative;">
+        <div class="editor-content" style="flex:1;">
+          <div class="code-editor">
+            <div class="line-numbers"><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div><div>13</div><div>14</div><div>15</div><div>16</div><div>17</div><div>18</div><div>19</div><div>20</div><div>21</div><div>22</div><div>23</div><div>24</div><div>25</div><div>26</div><div>27</div><div>28</div><div>29</div><div>30</div></div>
+            <div class="code-lines">
+              <div><span class="kw">import</span> { <span class="type">AxiosError</span> } <span class="kw">from</span> <span class="str">'axios'</span>;</div>
+              <div></div>
+              <div><span class="cm">// 格式化日期</span></div>
+              <div><span class="kw">export function</span> <span class="fn">formatDate</span>(<span class="var">date</span>: <span class="type">Date</span>): <span class="type">string</span> {</div>
+              <div>  <span class="kw">const</span> <span class="var">year</span> = <span class="var">date</span>.<span class="fn">getFullYear</span>();</div>
+              <div>  <span class="kw">const</span> <span class="var">month</span> = <span class="type">String</span>(<span class="var">date</span>.<span class="fn">getMonth</span>() + <span class="num">1</span>).<span class="fn">padStart</span>(<span class="num">2</span>, <span class="str">'0'</span>);</div>
+              <div>  <span class="kw">const</span> <span class="var">day</span> = <span class="type">String</span>(<span class="var">date</span>.<span class="fn">getDate</span>()).<span class="fn">padStart</span>(<span class="num">2</span>, <span class="str">'0'</span>);</div>
+              <div>  <span class="kw">return</span> <span class="str">`${<span class="var">year</span>}-${<span class="var">month</span>}-${<span class="var">day</span>}`</span>;</div>
+              <div>}</div>
+              <div></div>
+              <div style="background:rgba(124,92,252,0.08);"><span class="cm">// 错误处理工具函数</span></div>
+              <div style="background:rgba(124,92,252,0.08);"><span class="kw">export function</span> <span class="fn">handleError</span>(<span class="var">error</span>: <span class="type">unknown</span>): <span class="type">string</span> {</div>
+              <div style="background:rgba(124,92,252,0.08);">  <span class="kw">if</span> (<span class="var">error</span> <span class="kw">instanceof</span> <span class="type">Error</span>) {</div>
+              <div style="background:rgba(124,92,252,0.08);">    <span class="kw">return</span> <span class="var">error</span>.<span class="var">message</span>;</div>
+              <div style="background:rgba(124,92,252,0.08);">  }</div>
+              <div style="background:rgba(124,92,252,0.08);">  <span class="kw">return</span> <span class="str">'未知错误'</span>;</div>
+              <div style="background:rgba(124,92,252,0.08);">}</div>
+              <div></div>
+              <div><span class="cm">// 防抖函数</span></div>
+              <div><span class="kw">export function</span> <span class="fn">debounce</span>&lt;<span class="type">T</span> <span class="kw">extends</span> (...<span class="var">args</span>: <span class="type">any</span>[]) =&gt; <span class="type">void</span>&gt;(</div>
+              <div>  <span class="var">fn</span>: <span class="type">T</span>,</div>
+              <div>  <span class="var">delay</span>: <span class="type">number</span></div>
+              <div>): <span class="type">T</span> {</div>
+              <div>  <span class="kw">let</span> <span class="var">timer</span>: <span class="type">ReturnType</span>&lt;<span class="kw">typeof</span> <span class="var">setTimeout</span>&gt;;</div>
+              <div>  <span class="kw">return</span> ((...<span class="var">args</span>: <span class="type">any</span>[]) =&gt; {</div>
+              <div>    <span class="fn">clearTimeout</span>(<span class="var">timer</span>);</div>
+              <div>    <span class="var">timer</span> = <span class="fn">setTimeout</span>(() =&gt; <span class="fn">fn</span>(...<span class="var">args</span>), <span class="var">delay</span>);</div>
+              <div>  }) <span class="kw">as</span> <span class="type">T</span>;</div>
+              <div>}</div>
+              <div></div>
+            </div>
+          </div>
+          <!-- Inline Edit Overlay -->
+          <div class="inline-edit-overlay">
+            <div class="inline-input-box">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="#7c3aed" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="#7c3aed" stroke-width="1.5" fill="none"/></svg>
+              <input class="inline-input" value="增加对 AxiosError 的特殊处理，提取 HTTP 状态码和响应信息" />
+              <div class="inline-actions">
+                <button class="btn btn-ghost btn-sm">取消</button>
+                <button class="btn btn-primary btn-sm">⏎ 生成</button>
+              </div>
+            </div>
+            <!-- Diff Preview -->
+            <div class="diff-preview">
+              <div class="diff-header">
+                <span>utils.ts · 行 11-17 · LinkCode Inline Edit</span>
+                <span style="display:flex;gap:8px;">
+                  <button class="btn btn-ghost btn-sm" style="font-size:11px;">✕ 拒绝</button>
+                  <button class="btn btn-primary btn-sm" style="font-size:11px;">✓ 接受修改</button>
+                </span>
+              </div>
+              <div class="diff-line diff-context"><span class="diff-line-num">11</span><span class="diff-sign"> </span><span class="cm">// 错误处理工具函数</span></div>
+              <div class="diff-line diff-remove"><span class="diff-line-num">12</span><span class="diff-sign">−</span><span class="kw">export function</span> <span class="fn">handleError</span>(<span class="var">error</span>: <span class="type">unknown</span>): <span class="type">string</span> {</div>
+              <div class="diff-line diff-remove"><span class="diff-line-num">13</span><span class="diff-sign">−</span>  <span class="kw">if</span> (<span class="var">error</span> <span class="kw">instanceof</span> <span class="type">Error</span>) {</div>
+              <div class="diff-line diff-remove"><span class="diff-line-num">14</span><span class="diff-sign">−</span>    <span class="kw">return</span> <span class="var">error</span>.<span class="var">message</span>;</div>
+              <div class="diff-line diff-remove"><span class="diff-line-num">15</span><span class="diff-sign">−</span>  }</div>
+              <div class="diff-line diff-remove"><span class="diff-line-num">16</span><span class="diff-sign">−</span>  <span class="kw">return</span> <span class="str">'未知错误'</span>;</div>
+              <div class="diff-line diff-add"><span class="diff-line-num">12</span><span class="diff-sign">+</span><span class="kw">export function</span> <span class="fn">handleError</span>(<span class="var">error</span>: <span class="type">unknown</span>): { <span class="var">message</span>: <span class="type">string</span>; <span class="var">code</span>?: <span class="type">number</span> } {</div>
+              <div class="diff-line diff-add"><span class="diff-line-num">13</span><span class="diff-sign">+</span>  <span class="kw">if</span> (<span class="var">error</span> <span class="kw">instanceof</span> <span class="type">AxiosError</span>) {</div>
+              <div class="diff-line diff-add"><span class="diff-line-num">14</span><span class="diff-sign">+</span>    <span class="kw">return</span> {</div>
+              <div class="diff-line diff-add"><span class="diff-line-num">15</span><span class="diff-sign">+</span>      <span class="var">message</span>: <span class="var">error</span>.<span class="var">response</span>?.<span class="var">data</span>?.<span class="var">message</span> ?? <span class="var">error</span>.<span class="var">message</span>,</div>
+              <div class="diff-line diff-add"><span class="diff-line-num">16</span><span class="diff-sign">+</span>      <span class="var">code</span>: <span class="var">error</span>.<span class="var">response</span>?.<span class="var">status</span>,</div>
+              <div class="diff-line diff-add"><span class="diff-line-num">17</span><span class="diff-sign">+</span>    };</div>
+              <div class="diff-line diff-add"><span class="diff-line-num">18</span><span class="diff-sign">+</span>  }</div>
+              <div class="diff-line diff-add"><span class="diff-line-num">19</span><span class="diff-sign">+</span>  <span class="kw">if</span> (<span class="var">error</span> <span class="kw">instanceof</span> <span class="type">Error</span>) {</div>
+              <div class="diff-line diff-add"><span class="diff-line-num">20</span><span class="diff-sign">+</span>    <span class="kw">return</span> { <span class="var">message</span>: <span class="var">error</span>.<span class="var">message</span> };</div>
+              <div class="diff-line diff-add"><span class="diff-line-num">21</span><span class="diff-sign">+</span>  }</div>
+              <div class="diff-line diff-add"><span class="diff-line-num">22</span><span class="diff-sign">+</span>  <span class="kw">return</span> { <span class="var">message</span>: <span class="str">'未知错误'</span> };</div>
+              <div class="diff-line diff-context"><span class="diff-line-num">17</span><span class="diff-sign"> </span>}</div>
+            </div>
+          </div>
+        </div>
+        <div class="minimap" style="width:60px;background:var(--bg-primary);border-left:1px solid var(--border);opacity:0.4;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div class="status-accent">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" fill="white" opacity="0.9"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" stroke-width="1.5" fill="none"/></svg>
+      LinkCode
+    </div>
+    <div class="status-bar-left">
+      <div class="status-item"><span style="width:6px;height:6px;border-radius:50%;background:#cca700;display:inline-block;"></span> Inline Edit 模式</div>
+      <div class="status-item">🪙 ¥12.50</div>
+    </div>
+    <div class="status-bar-right">
+      <div class="status-item">⌘K 编辑</div>
+      <div class="status-item">TypeScript</div>
+    </div>
+  </div>
+</div>
+<script>
+// Diff lines expand animation
+document.querySelectorAll('.diff-add, .diff-remove').forEach((line, i) => {
+  line.style.opacity = '0';
+  line.style.transform = 'translateX(-10px)';
+  line.style.transition = 'all 0.3s ease';
+  setTimeout(() => {
+    line.style.opacity = '1';
+    line.style.transform = 'translateX(0)';
+  }, 600 + i * 80);
+});
+
+// Accept/Reject button interactions
+document.querySelectorAll('.btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const text = btn.textContent.trim();
+    if (text.includes('接受')) {
+      btn.textContent = '✅ 已接受';
+      btn.style.background = 'var(--green)';
+    } else if (text.includes('拒绝')) {
+      btn.textContent = '❌ 已拒绝';
+      btn.style.background = 'var(--red)';
+    }
+  });
+});
+</script>
+</body>
+</html>

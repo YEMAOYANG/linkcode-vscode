@@ -1,12 +1,15 @@
+import * as path from 'node:path'
 import * as vscode from 'vscode'
-import type { ExtToWebMsg, WebToExtMsg, StoredChatMessage, ApiModelInfo, SessionSummary, PricingResponse } from '../shared/types'
+import type { ExtToWebMsg, WebToExtMsg, StoredChatMessage, ApiModelInfo, SessionSummary, PricingResponse, AtSearchItem, ChatMode } from '../shared/types'
 import type { ChatMessage } from '../api/types'
 import type { ApiClient } from '../api/client'
 import type { SecretStore } from '../utils/secretStorage'
+import type { DiffController } from '../diff/DiffController'
 import { getNonce } from '../utils/crypto'
 import { Logger } from '../utils/logger'
 import { AuthError, ApiError } from '../shared/errors'
-import { CONFIG_SECTION, DEFAULT_MODEL, DEFAULT_API_ENDPOINT, RECOMMENDED_MODELS, MODEL_TO_GROUP, TOKEN_GROUPS } from '../shared/constants'
+import { CONFIG_SECTION, DEFAULT_MODEL, DEFAULT_API_ENDPOINT, MODEL_TO_GROUP, TOKEN_GROUPS, inferTokenGroup } from '../shared/constants'
+import { SYSTEM_PROMPTS, buildFromPlanPrompt } from '../shared/prompts'
 
 const HISTORY_KEY = 'linkcode.chatHistory'
 const SESSION_LIST_KEY = 'linkcode.sessionList'
@@ -20,6 +23,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private _chatHistory: ChatMessage[] = []
   private _attachedFiles: Array<{ name: string; content: string }> = []
   private _secretStore?: SecretStore
+  private _diffController?: DiffController
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -30,6 +34,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   /** Inject SecretStore for group token management */
   public setSecretStore(store: SecretStore): void {
     this._secretStore = store
+  }
+
+  /** Phase 5B: inject DiffController for Cursor-style inline diff */
+  public setDiffController(controller: DiffController): void {
+    this._diffController = controller
   }
 
   public resolveWebviewView(
@@ -51,8 +60,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const messageDisposable = webviewView.webview.onDidReceiveMessage((msg: WebToExtMsg) => {
       switch (msg.type) {
         case 'sendMessage':
-          this._handleSendMessage(msg.text)
+          void this._handleSendMessage(msg.text, msg.mode ?? 'ask')
           break
+        case 'buildFromPlan': {
+          const bfpMsg = msg as { type: 'buildFromPlan'; planContent: string; modelId?: string }
+          void this._handleBuildFromPlan(bfpMsg.planContent, bfpMsg.modelId)
+          break
+        }
         case 'ready':
           this._sendModelInfo()
           this._fetchModels()
@@ -71,9 +85,37 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         case 'newChat':
           this._handleNewChat()
           break
-        case 'applyEdit':
-          this._handleApplyEdit(msg.code)
+        case 'applyEdit': {
+          const aeMsg = msg as {
+            type: 'applyEdit'
+            code: string
+            filename?: string
+            language?: string
+            lineRange?: string
+          }
+          void this._handleApplyEdit(aeMsg.code, aeMsg.filename, aeMsg.language, aeMsg.lineRange)
           break
+        }
+        case 'applyEditAcceptAll': {
+          const m = msg as { type: 'applyEditAcceptAll'; sessionId: string }
+          void this._diffController?.acceptAll(m.sessionId)
+          break
+        }
+        case 'applyEditRejectAll': {
+          const m = msg as { type: 'applyEditRejectAll'; sessionId: string }
+          void this._diffController?.rejectAll(m.sessionId)
+          break
+        }
+        case 'applyEditAcceptHunk': {
+          const m = msg as { type: 'applyEditAcceptHunk'; sessionId: string; hunkId: string }
+          void this._diffController?.acceptHunk(m.sessionId, m.hunkId)
+          break
+        }
+        case 'applyEditRejectHunk': {
+          const m = msg as { type: 'applyEditRejectHunk'; sessionId: string; hunkId: string }
+          void this._diffController?.rejectHunk(m.sessionId, m.hunkId)
+          break
+        }
         case 'setApiKey':
           this._handleSetApiKey(msg.key)
           break
@@ -116,7 +158,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
         case 'inlineEditAccept': {
           const acceptMsg = msg as { type: 'inlineEditAccept'; code: string }
-          this._handleApplyEdit(acceptMsg.code)
+          void this._handleApplyEdit(acceptMsg.code)
           break
         }
         case 'githubLogin':
@@ -169,6 +211,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this._handleLoadSession(lsMsg.sessionId)
           break
         }
+        // Phase 3B: Cursor-style @ mention search
+        case 'atSearch': {
+          const asMsg = msg as {
+            type: 'atSearch'
+            requestId: string
+            kind: 'files' | 'folders' | 'code' | 'codebase' | 'docs' | 'pastChats'
+            query: string
+          }
+          void this._handleAtSearch(asMsg.requestId, asMsg.kind, asMsg.query)
+          break
+        }
       }
     })
 
@@ -193,11 +246,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   public handleUserAction(action: 'explain' | 'refactor' | 'review', payload: string): void {
     this.postMessage({ type: 'user_action', action, payload })
     const prompt = `[${action}]\n${payload}`
-    this._handleSendMessage(prompt)
+    void this._handleSendMessage(prompt, 'ask')
   }
 
-  public quoteCodeToChat(code: string, language: string): void {
-    this.postMessage({ type: 'quote_code', code, language })
+  public quoteCodeToChat(
+    code: string,
+    language: string,
+    meta?: { filename?: string; filepath?: string; lineStart?: number; lineEnd?: number },
+  ): void {
+    this.postMessage({
+      type: 'quote_code',
+      code,
+      language,
+      filename: meta?.filename,
+      filepath: meta?.filepath,
+      lineStart: meta?.lineStart,
+      lineEnd: meta?.lineEnd,
+    })
   }
 
   public sendInlineEditContext(code: string, _language: string, filepath: string): void {
@@ -222,80 +287,86 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const endpoint = config.get<string>('apiEndpoint') ?? DEFAULT_API_ENDPOINT
 
     try {
-      let apiKey: string | undefined
-      const tokens = config.get<Record<string, string>>('apiTokens') ?? {}
-      const tokenValues = Object.values(tokens)
-      if (tokenValues.length > 0) {
-        apiKey = tokenValues[0]
+      // Phase 2.4: gather ALL configured tokens (apiTokens config + SecretStorage groups)
+      const apiKeys = new Set<string>()
+      const configTokens = config.get<Record<string, string>>('apiTokens') ?? {}
+      for (const v of Object.values(configTokens)) {
+        if (v && v.trim()) apiKeys.add(v.trim())
       }
-      if (!apiKey) {
-        apiKey = await this._getApiKeyForModels()
+      if (this._secretStore) {
+        const configuredGroups = await this._secretStore.getConfiguredGroups()
+        for (const group of configuredGroups) {
+          const token = await this._secretStore.getGroupToken(group)
+          if (token && token.trim()) apiKeys.add(token.trim())
+        }
+      }
+      if (apiKeys.size === 0) {
+        const legacyKey = await this._getApiKeyForModels()
+        if (legacyKey) apiKeys.add(legacyKey)
       }
 
-      if (!apiKey) {
-        logger.warn('[fetchModels] No API key available, using fallback models')
-        this._sendFallbackModels()
+      if (apiKeys.size === 0) {
+        logger.info('[fetchModels] No API key configured, sending empty model list')
+        this.postMessage({ type: 'modelList', models: [] })
         return
       }
 
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), MODEL_FETCH_TIMEOUT_MS)
-
-      try {
-        const res = await fetch(`${endpoint}/v1/models`, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          signal: controller.signal,
-        })
-
-        if (!res.ok) {
-          logger.warn(`[fetchModels] API returned ${res.status}, using fallback`)
-          this._sendFallbackModels()
-          return
+      const fetchOne = async (apiKey: string): Promise<string[]> => {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), MODEL_FETCH_TIMEOUT_MS)
+        try {
+          const res = await fetch(`${endpoint}/v1/models`, {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            signal: controller.signal,
+          })
+          if (!res.ok) {
+            logger.warn(`[fetchModels] API returned ${res.status} for one token`)
+            return []
+          }
+          const data = (await res.json()) as { data?: Array<{ id: string }> }
+          return data.data?.map(m => m.id) ?? []
+        } finally {
+          clearTimeout(timeout)
         }
-
-        const data = (await res.json()) as {
-          data?: Array<{ id: string; object?: string }>
-        }
-
-        if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
-          logger.warn('[fetchModels] Empty response, using fallback')
-          this._sendFallbackModels()
-          return
-        }
-
-        const models: ApiModelInfo[] = data.data.map((m) => ({
-          id: m.id,
-          label: m.id,
-          provider: ChatViewProvider._inferProvider(m.id),
-        }))
-
-        logger.info(`[fetchModels] Got ${models.length} models from API`)
-        this.postMessage({ type: 'modelList', models })
-      } finally {
-        clearTimeout(timeout)
       }
+
+      const results = await Promise.allSettled([...apiKeys].map(fetchOne))
+      const allIds = new Set<string>()
+      for (const r of results) {
+        if (r.status === 'fulfilled') {
+          for (const id of r.value) allIds.add(id)
+        } else {
+          const reason = r.reason instanceof Error ? r.reason.message : String(r.reason)
+          logger.warn(`[fetchModels] One token fetch failed: ${reason}`)
+        }
+      }
+
+      if (allIds.size === 0) {
+        logger.warn('[fetchModels] All tokens returned empty, sending empty model list')
+        this.postMessage({ type: 'modelList', models: [] })
+        return
+      }
+
+      const models: ApiModelInfo[] = [...allIds].map((id) => ({
+        id,
+        label: id,
+        provider: ChatViewProvider._inferProvider(id),
+      }))
+
+      logger.info(`[fetchModels] Aggregated ${models.length} models from ${apiKeys.size} token(s)`)
+      this.postMessage({ type: 'modelList', models })
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
-        logger.warn('[fetchModels] Request timed out, using fallback')
+        logger.warn('[fetchModels] Request timed out, sending empty list')
       } else {
         logger.error('[fetchModels] Failed to fetch models', err)
       }
-      this._sendFallbackModels()
+      this.postMessage({ type: 'modelList', models: [] })
     }
-  }
-
-  private _sendFallbackModels(): void {
-    const models: ApiModelInfo[] = RECOMMENDED_MODELS.map((m) => ({
-      id: m.id,
-      label: m.label,
-      provider: m.provider,
-      tag: m.tag || undefined,
-    }))
-    this.postMessage({ type: 'modelList', models })
   }
 
   /** Fetch pricing data from Smoothlink public API and forward to WebView */
@@ -354,19 +425,151 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.postMessage({ type: 'chatCleared' })
   }
 
-  private _handleApplyEdit(code: string): void {
-    const editor = vscode.window.activeTextEditor
-    if (!editor) {
-      vscode.window.showWarningMessage('LinkCode: No active editor to apply code to.')
+  /**
+   * Phase 5A/5B: Apply code to the editor as a Cursor-style inline diff session.
+   * Falls back to direct WorkspaceEdit when no target file can be resolved.
+   *
+   * When `lineRange` is provided (e.g. "19-25"), the incoming `code` is a partial
+   * snippet. We merge it into the original file content before passing the full
+   * result to DiffController so the diff is correct.
+   */
+  private async _handleApplyEdit(
+    code: string,
+    filename?: string,
+    _language?: string,
+    lineRange?: string,
+  ): Promise<void> {
+    const logger = Logger.getInstance()
+    let targetUri: vscode.Uri | undefined
+
+    if (filename) {
+      const matches = await vscode.workspace.findFiles(`**/${filename}`, '**/node_modules/**', 5)
+      if (matches.length) targetUri = matches[0]
+    }
+    if (!targetUri) {
+      targetUri = vscode.window.activeTextEditor?.document.uri
+    }
+    if (!targetUri) {
+      vscode.window.showWarningMessage('LinkCode: 未找到应用目标，请先打开目标文件或让 AI 附上 filename')
       return
     }
-    const selection = editor.selection
-    const range = selection.isEmpty
-      ? new vscode.Range(selection.active, selection.active)
-      : selection
+
+    let fullNewContent = code
+
+    // When the AI returns a partial snippet with a line range, merge it into
+    // the original file so DiffController receives the complete new file.
+    if (lineRange) {
+      const rangeMatch = /^(\d+)(?:-(\d+))?$/.exec(lineRange)
+      if (rangeMatch) {
+        try {
+          const doc = await vscode.workspace.openTextDocument(targetUri)
+          const originalLines = doc.getText().split('\n')
+          const startLine = Math.max(1, parseInt(rangeMatch[1], 10))
+          const endLine = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : startLine
+          const clampedEnd = Math.min(endLine, originalLines.length)
+
+          const snippetLines = code.split('\n')
+          const before = originalLines.slice(0, startLine - 1)
+          const after = originalLines.slice(clampedEnd)
+          fullNewContent = [...before, ...snippetLines, ...after].join('\n')
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err)
+          logger.warn(`[applyEdit] Failed to merge line range, using raw code: ${errMsg}`)
+        }
+      }
+    }
+
+    if (this._diffController) {
+      try {
+        await this._diffController.startSession(targetUri, fullNewContent)
+        return
+      } catch (err) {
+        logger.error('[applyEdit] DiffController failed, falling back to WorkspaceEdit', err)
+      }
+    }
+
+    // Legacy fallback: replace whole file
+    const editor = vscode.window.activeTextEditor
+    if (!editor || editor.document.uri.toString() !== targetUri.toString()) {
+      await vscode.window.showTextDocument(targetUri)
+    }
+    const active = vscode.window.activeTextEditor
+    if (!active) return
+    const doc = active.document
+    const fullRange = new vscode.Range(
+      doc.positionAt(0),
+      doc.positionAt(doc.getText().length),
+    )
     const edit = new vscode.WorkspaceEdit()
-    edit.replace(editor.document.uri, range, code)
-    void Promise.resolve(vscode.workspace.applyEdit(edit))
+    edit.replace(targetUri, fullRange, fullNewContent)
+    const ok = await vscode.workspace.applyEdit(edit)
+    if (!ok) {
+      logger.warn('[applyEdit] WorkspaceEdit was rejected by VS Code')
+      vscode.window.showWarningMessage('LinkCode: 代码应用失败，请检查文件是否只读')
+    }
+  }
+
+  /**
+   * Agent mode: scan streamed content for Cursor-style fences and apply them
+   * serially through DiffController so the user sees inline diffs for each.
+   *
+   * Recognised fence variants:
+   *   ```lang:filename:start-end
+   *   ```lang:filename
+   * A trailing `filename` without extension or a pure `lang` fence is ignored
+   * (treated as plain illustrative code).
+   */
+  private async _autoApplyAgentBlocks(content: string): Promise<void> {
+    const logger = Logger.getInstance()
+    const fenceRe = /```([a-zA-Z0-9+_-]+)((?::[^\n`]+)?)\n([\s\S]*?)```/g
+    const blocks: Array<{ code: string; language: string; filename?: string; lineRange?: string }> = []
+
+    let match: RegExpExecArray | null
+    while ((match = fenceRe.exec(content)) !== null) {
+      const language = match[1]
+      const rawMeta = match[2] // e.g. ":filename.ts:12-20" or ":filename.ts" or ""
+      const code = match[3]
+      const metaParts = rawMeta.startsWith(':') ? rawMeta.slice(1).split(':') : []
+      let filename: string | undefined
+      let lineRange: string | undefined
+      for (const part of metaParts) {
+        if (!part) continue
+        if (/^\d+(?:-\d+)?$/.test(part)) {
+          lineRange = part
+        } else {
+          filename = part
+        }
+      }
+      if (!filename) continue // Plain ```lang code — not an applicable block
+      blocks.push({ code, language, filename, lineRange })
+    }
+
+    if (blocks.length === 0) {
+      logger.info('[autoApplyAgent] No applicable fences found in response')
+      return
+    }
+
+    logger.info(`[autoApplyAgent] Applying ${blocks.length} block(s) serially`)
+    for (const b of blocks) {
+      try {
+        await this._handleApplyEdit(b.code, b.filename, b.language, b.lineRange)
+      } catch (err) {
+        logger.error(`[autoApplyAgent] Failed to apply block for ${b.filename}`, err)
+      }
+    }
+  }
+
+  /**
+   * Plan → Build: switch to the requested model (if any), then resend the plan
+   * content as an Agent-mode prompt to trigger code execution.
+   */
+  private async _handleBuildFromPlan(planContent: string, modelId?: string): Promise<void> {
+    if (modelId) {
+      const config = vscode.workspace.getConfiguration(CONFIG_SECTION)
+      await Promise.resolve(config.update('model', modelId, vscode.ConfigurationTarget.Global))
+    }
+    const prompt = buildFromPlanPrompt(planContent)
+    await this._handleSendMessage(prompt, 'agent')
   }
 
   private _sendHistory(): void {
@@ -379,8 +582,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     void Promise.resolve(this.globalState.update(HISTORY_KEY, messages))
   }
 
-  /** Task 2: File attachments are now injected into the user message */
-  private async _handleSendMessage(text: string): Promise<void> {
+  /**
+   * Send a user message to the AI.
+   * `mode` controls which system prompt is injected and whether code fences
+   * are auto-applied to the editor when the stream ends.
+   */
+  private async _handleSendMessage(text: string, mode: ChatMode = 'ask'): Promise<void> {
     const logger = Logger.getInstance()
 
     // Build file context from attached files
@@ -418,8 +625,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       let assistantContent = ''
       let lastUsage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined
 
+      // Cursor-style: prepend a mode-specific system prompt, then the full chat history.
+      const messagesForApi: ChatMessage[] = [
+        { role: 'system', content: SYSTEM_PROMPTS[mode] },
+        ...this._chatHistory,
+      ]
+
       for await (const chunk of this.apiClient.streamChat(
-        this._chatHistory,
+        messagesForApi,
         this._abortController.signal
       )) {
         if (chunk.type === 'token' && chunk.content) {
@@ -442,6 +655,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
       this._chatHistory.push({ role: 'assistant', content: assistantContent })
       this.postMessage({ type: 'stream_end', usage: lastUsage })
+
+      if (mode === 'agent' && assistantContent.trim()) {
+        await this._autoApplyAgentBlocks(assistantContent)
+      }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
         this.postMessage({ type: 'stream_end' })
@@ -568,6 +785,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             success: true,
             models: modelIds,
           })
+          // Phase 2: merge newly-unlocked models into webview's model list.
+          // 对 _detect (onboarding 快速验证) 模式,推断真实分组后同样合并,
+          // 避免前端默认模型列表与已解锁分组脱节导致选到错误模型。
+          if (modelIds.length > 0) {
+            const effectiveGroup = group === '_detect' ? inferTokenGroup(modelIds) : group
+            if (effectiveGroup && effectiveGroup !== 'unknown') {
+              const mergedModels: ApiModelInfo[] = modelIds.map((id) => ({
+                id,
+                label: id,
+                provider: ChatViewProvider._inferProvider(id),
+              }))
+              this.postMessage({ type: 'modelListMerge', group: effectiveGroup, models: mergedModels })
+            }
+          }
         } else {
           this.postMessage({
             type: 'groupTokenValidated',
@@ -607,8 +838,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (!this._secretStore) return
     await this._secretStore.deleteGroupToken(group)
     Logger.getInstance().info(`[deleteGroupToken] Deleted token for group: ${group}`)
-    // Refresh status
     await this._handleGetGroupTokenStatus()
+    // Immediately clear the model list so the UI reacts before the async re-fetch completes
+    this.postMessage({ type: 'modelList', models: [] })
+    void this._fetchModels()
   }
 
   private _handleGetRecentFiles(): void {
@@ -622,8 +855,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const uri = (input as { uri: vscode.Uri }).uri
         if (uri.scheme === 'file' && !seen.has(uri.fsPath)) {
           seen.add(uri.fsPath)
-          const segments = uri.fsPath.split('/')
-          files.push({ name: segments[segments.length - 1] ?? uri.fsPath, path: uri.fsPath })
+          files.push({ name: path.basename(uri.fsPath), path: uri.fsPath })
         }
       }
     }
@@ -631,18 +863,168 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.postMessage({ type: 'recentFiles', files: files.slice(0, 20) })
   }
 
-  /** Task 3: Read file content and send to webview */
+  /** Task 3: Read file content and send to webview. Supports file:// URI, absolute path, or workspace-relative path. */
   private async _handleGetFileContent(filepath: string): Promise<void> {
     try {
-      const uri = vscode.Uri.file(filepath)
+      let uri: vscode.Uri
+      if (filepath.startsWith('file://')) {
+        uri = vscode.Uri.parse(filepath)
+      } else if (path.isAbsolute(filepath)) {
+        uri = vscode.Uri.file(filepath)
+      } else {
+        // Detector+Finder: resolve basename inside the workspace
+        const matches = await vscode.workspace.findFiles(`**/${filepath}`, '**/node_modules/**', 5)
+        if (!matches.length) {
+          Logger.getInstance().warn(`[getFileContent] Not found: ${filepath}`)
+          return
+        }
+        uri = matches[0]
+      }
       const content = await vscode.workspace.fs.readFile(uri)
       const text = new TextDecoder().decode(content)
-      const segments = filepath.split('/')
-      const name = segments[segments.length - 1] ?? filepath
-      this.postMessage({ type: 'fileContent', filepath, content: text, name })
+      this.postMessage({
+        type: 'fileContent',
+        filepath: uri.fsPath,
+        content: text,
+        name: path.basename(uri.fsPath),
+      })
     } catch (err: unknown) {
       Logger.getInstance().error(`[getFileContent] Failed to read ${filepath}`, err)
     }
+  }
+
+  /**
+   * Phase 3B: Cursor 2.0 @ mention dispatch.
+   * Supports: files / folders / code / codebase / docs / pastChats.
+   */
+  private async _handleAtSearch(
+    requestId: string,
+    kind: 'files' | 'folders' | 'code' | 'codebase' | 'docs' | 'pastChats',
+    query: string,
+  ): Promise<void> {
+    const send = (items: AtSearchItem[]): void => {
+      this.postMessage({ type: 'atSearchResult', requestId, kind, items })
+    }
+
+    try {
+      switch (kind) {
+        case 'files': {
+          const pattern = query.trim() ? `**/*${query.trim()}*` : '**/*'
+          const uris = await vscode.workspace.findFiles(pattern, '**/node_modules/**', 50)
+          const items: AtSearchItem[] = uris.map((uri) => ({
+            kind: 'files',
+            label: path.basename(uri.fsPath),
+            detail: vscode.workspace.asRelativePath(uri),
+            value: vscode.workspace.asRelativePath(uri),
+            filepath: uri.fsPath,
+          }))
+          send(items)
+          break
+        }
+        case 'folders': {
+          const folders = await this._collectFolders(query.trim().toLowerCase())
+          send(folders)
+          break
+        }
+        case 'code': {
+          const symbols = (await vscode.commands.executeCommand<vscode.SymbolInformation[]>(
+            'vscode.executeWorkspaceSymbolProvider',
+            query,
+          )) ?? []
+          const items: AtSearchItem[] = symbols.slice(0, 50).map((s) => {
+            const uri = s.location.uri
+            const range = s.location.range
+            return {
+              kind: 'code',
+              label: s.name,
+              detail: `${s.containerName ? s.containerName + ' · ' : ''}${vscode.workspace.asRelativePath(uri)}`,
+              value: s.name,
+              filepath: uri.fsPath,
+              lineStart: range.start.line + 1,
+              lineEnd: range.end.line + 1,
+            }
+          })
+          send(items)
+          break
+        }
+        case 'codebase': {
+          // v1 placeholder: echo query back; real implementation needs ripgrep integration
+          send([
+            {
+              kind: 'codebase',
+              label: query || '@Codebase',
+              detail: '整个代码库语义检索（发送时注入 top-K 片段，v1 占位）',
+              value: `@Codebase${query ? ':' + query : ''}`,
+            },
+          ])
+          break
+        }
+        case 'pastChats': {
+          const sessions = this.globalState.get<SessionSummary[]>(SESSION_LIST_KEY, [])
+          const items: AtSearchItem[] = sessions
+            .filter((s) => !query.trim() || s.title.toLowerCase().includes(query.toLowerCase()))
+            .slice(0, 20)
+            .map((s) => ({
+              kind: 'pastChats',
+              label: s.title || 'Untitled chat',
+              detail: `${s.messageCount} messages · ${new Date(s.timestamp).toLocaleDateString()}`,
+              value: `chat:${s.id}`,
+              sessionId: s.id,
+            }))
+          send(items)
+          break
+        }
+        case 'docs': {
+          // v1 placeholder — Coming soon
+          send([])
+          break
+        }
+      }
+    } catch (err: unknown) {
+      Logger.getInstance().error(`[atSearch] ${kind} failed`, err)
+      send([])
+    }
+  }
+
+  /** Collect folders from workspace root (top 3 levels) filtered by query. */
+  private async _collectFolders(query: string): Promise<AtSearchItem[]> {
+    const roots = vscode.workspace.workspaceFolders ?? []
+    const items: AtSearchItem[] = []
+    const MAX_DEPTH = 3
+    const MAX_RESULTS = 50
+    const EXCLUDE = new Set(['node_modules', '.git', 'dist', 'out', '.next', '.nuxt', '.cache', 'coverage'])
+
+    const walk = async (uri: vscode.Uri, depth: number): Promise<void> => {
+      if (items.length >= MAX_RESULTS || depth > MAX_DEPTH) return
+      let children: [string, vscode.FileType][]
+      try {
+        children = await vscode.workspace.fs.readDirectory(uri)
+      } catch {
+        return
+      }
+      for (const [name, type] of children) {
+        if (items.length >= MAX_RESULTS) return
+        if (type !== vscode.FileType.Directory) continue
+        if (EXCLUDE.has(name) || name.startsWith('.')) continue
+        const childUri = vscode.Uri.joinPath(uri, name)
+        const rel = vscode.workspace.asRelativePath(childUri)
+        if (!query || rel.toLowerCase().includes(query)) {
+          items.push({
+            kind: 'folders',
+            label: name,
+            detail: rel,
+            value: rel,
+            filepath: childUri.fsPath,
+          })
+        }
+        await walk(childUri, depth + 1)
+      }
+    }
+
+    for (const root of roots) {
+      await walk(root.uri, 0)
+    }
+    return items
   }
 
   /** Task 4: Save current session to history list */
